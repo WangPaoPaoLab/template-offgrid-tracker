@@ -1634,7 +1634,8 @@ static int sensor_send_imu_block(uint32_t wake_interval_ms)
 	size_t offset = edgez_sensor_block_encode_header(
 		block, sizeof(block), EDGEZ_SENSOR_BLOCK_KIND_IMU,
 		EDGEZ_SENSOR_BLOCK_IMU_RECORD_SIZE, count,
-		sensor_block_sequence, &sensor_settings.value);
+		sensor_block_sequence, EDGEZ_IMU_SAMPLE_PERIOD_MS,
+		&sensor_settings.value);
 	if (offset == 0U) {
 		return -EINVAL;
 	}

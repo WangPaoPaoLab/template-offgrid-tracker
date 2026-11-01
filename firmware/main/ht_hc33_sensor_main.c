@@ -1273,7 +1273,8 @@ static esp_err_t send_voltage_block(uint32_t interval_ms)
                   EDGEZ_SENSOR_SETTINGS_MAX_SAMPLES_PER_BLOCK * sizeof(float)];
     size_t offset = edgez_sensor_block_encode_header(
         block, sizeof(block), EDGEZ_SENSOR_BLOCK_KIND_BATTERY_VOLTAGE,
-        sizeof(float), count, block_sequence, &sensor_settings.value);
+        sizeof(float), count, block_sequence, interval_ms,
+        &sensor_settings.value);
     if (offset == 0U) return ESP_ERR_INVALID_STATE;
     for (uint8_t i = 0U; i < count; ++i) {
         edgez_sensor_put_float_le(block + offset, voltage_samples[i]);

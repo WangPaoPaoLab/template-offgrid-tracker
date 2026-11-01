@@ -172,7 +172,7 @@ async function deleteDevice(deviceId) {
 }
 
 async function publishImuBlock(samples, {
-  mac = "02:11:22:33:44:55", sequence = 7, intervalMs = 15000, corruptDigest = false,
+  mac = "02:11:22:33:44:55", sequence = 7, intervalMs = 80, corruptDigest = false,
 } = {}) {
   const block = Buffer.alloc(24 + samples.length * 25);
   block.write("EZSB", 0, "ascii");
@@ -366,7 +366,7 @@ test("nRF54L15 binary IMU blocks are expanded into time-series points", async ()
   assert.match(lines[1], /sample_index=1 .*gyro_valid=false/);
   const firstTimestamp = BigInt(lines[0].split(" ").at(-1));
   const secondTimestamp = BigInt(lines[1].split(" ").at(-1));
-  assert.equal(secondTimestamp - firstTimestamp, 15000000000n);
+  assert.equal(secondTimestamp - firstTimestamp, 80000000n);
   assert.equal(rows.length, 0, "blocks belong in history and must not replace latest beacon telemetry");
 });
 

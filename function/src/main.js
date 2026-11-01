@@ -167,7 +167,7 @@ function decodeSensorBlock(encoded, encoding) {
   const recordSize = bytes.readUInt16LE(20);
   if (!kind || recordSize !== kind.recordSize || configuredSamples > SENSOR_BLOCK_MAX_SAMPLES ||
       sampleCount < 1 || sampleCount > SENSOR_BLOCK_MAX_SAMPLES ||
-      samplingIntervalMs < 1000 || samplingIntervalMs > 3600000 ||
+      samplingIntervalMs < 1 || samplingIntervalMs > 3600000 ||
       bytes.length !== SENSOR_BLOCK_HEADER_SIZE + sampleCount * recordSize) {
     throw new Error("Sensor block shape is invalid");
   }
@@ -195,7 +195,8 @@ function decodeSensorBlock(encoded, encoding) {
 function blockLines(target, block, receivedAt) {
   const receivedNs = BigInt(Date.parse(receivedAt)) * 1000000n;
   return block.samples.map((sample, index) => {
-    const ageMs = BigInt((block.sampleCount - 1 - index) * block.samplingIntervalMs);
+    const elapsedMs = index * block.samplingIntervalMs;
+    const ageMs = BigInt((block.sampleCount - 1) * block.samplingIntervalMs - elapsedMs);
     const timestamp = receivedNs - ageMs * 1000000n;
     const tags = [
       `serial=${escapeTag(target.serial)}`,

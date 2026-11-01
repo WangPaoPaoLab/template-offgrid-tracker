@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#define EDGEZ_IMU_SAMPLE_PERIOD_MS 80U
+
 struct edgez_imu_sample {
 	float accel_m_s2[3];
 	float gyro_rad_s[3];

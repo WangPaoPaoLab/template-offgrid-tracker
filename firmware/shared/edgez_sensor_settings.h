@@ -69,10 +69,10 @@ static inline void edgez_sensor_put_float_le(uint8_t *output, float value)
 static inline size_t edgez_sensor_block_encode_header(
     uint8_t *output, size_t capacity, uint8_t sample_kind,
     uint16_t record_size, uint16_t sample_count, uint32_t block_sequence,
-    const struct edgez_sensor_settings *settings)
+    uint32_t sample_period_ms, const struct edgez_sensor_settings *settings)
 {
     if (output == NULL || capacity < EDGEZ_SENSOR_BLOCK_HEADER_SIZE ||
-        record_size == 0U || sample_count == 0U ||
+        record_size == 0U || sample_count == 0U || sample_period_ms == 0U ||
         !edgez_sensor_settings_valid(settings)) {
         return 0U;
     }
@@ -82,7 +82,9 @@ static inline size_t edgez_sensor_block_encode_header(
     output[6] = settings->block_sampling_count > 0U ?
         EDGEZ_SENSOR_BLOCK_FLAG_SAMPLING_ENABLED : 0U;
     output[7] = EDGEZ_SENSOR_BLOCK_HEADER_SIZE;
-    edgez_sensor_put_le32(output + 8U, settings->sampling_interval_ms);
+    /* This is the interval between samples inside this block, not the
+     * device's beacon/wake interval. Sample zero is the block time origin. */
+    edgez_sensor_put_le32(output + 8U, sample_period_ms);
     edgez_sensor_put_le16(output + 12U, settings->block_sampling_count);
     edgez_sensor_put_le16(output + 14U, sample_count);
     edgez_sensor_put_le32(output + 16U, block_sequence);
