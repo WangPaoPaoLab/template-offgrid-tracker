@@ -16,7 +16,7 @@ const remoteId = "22222222-2222-4222-8222-222222222222";
 const devices = new Map([
   [gatewayId, { $id: gatewayId, serial: "AABBCCDDEEFF", markerType: "gateway", markerColor: "blue", metadata: { profileId: "profile-a" },
     $permissions: ['read("team:profile-a")'] }],
-  [remoteId, { $id: remoteId, serial: "112233445566", markerType: "tracker", markerColor: "orange", gatewayDeviceId: gatewayId, metadata: { profileId: "profile-a" },
+  [remoteId, { $id: remoteId, serial: "112233445566", halowMac: "02:11:22:33:44:55", markerType: "tracker", markerColor: "orange", gatewayDeviceId: gatewayId, metadata: { profileId: "profile-a" },
     $permissions: ['read("team:profile-a")'] }],
 ]);
 const originalFetch = globalThis.fetch;
@@ -62,9 +62,9 @@ beforeEach(() => {
     const parsed = new URL(href);
     if (parsed.pathname === "/v1/devices" && options.method === "GET") {
       const query = parsed.searchParams.get("queries[]");
-      const serial = query ? JSON.parse(query).values[0] : "";
+      const filter = query ? JSON.parse(query) : null;
       return { ok: true, status: 200, json: async () => ({
-        devices: [...devices.values()].filter((device) => !serial || device.serial === serial),
+        devices: [...devices.values()].filter((device) => !filter || device[filter.attribute] === filter.values[0]),
       }) };
     }
     if (parsed.pathname === "/v1/devices" && options.method === "POST") {
@@ -165,6 +165,41 @@ async function deleteDevice(deviceId) {
       "x-appwrite-key": "test-key",
     } },
     res: { json: (body, status = 200) => ({ body, status }) },
+    error: (message) => { throw new Error(message); },
+  });
+}
+
+async function publishImuBlock(samples, { mac = "02:11:22:33:44:55", sequence = 7, intervalMs = 15000 } = {}) {
+  const bytes = Buffer.alloc(24 + samples.length * 25);
+  bytes.write("EZSB", 0, "ascii");
+  bytes[4] = 1;
+  bytes[5] = 2;
+  bytes[6] = 1;
+  bytes[7] = 24;
+  bytes.writeUInt32LE(intervalMs, 8);
+  bytes.writeUInt16LE(samples.length, 12);
+  bytes.writeUInt16LE(samples.length, 14);
+  bytes.writeUInt32LE(sequence, 16);
+  bytes.writeUInt16LE(25, 20);
+  samples.forEach((sample, index) => {
+    const offset = 24 + index * 25;
+    [...sample.accel, ...sample.gyro].forEach((value, field) => bytes.writeFloatLE(value, offset + field * 4));
+    bytes[offset + 24] = sample.gyroValid ? 1 : 0;
+  });
+  return main({
+    req: {
+      headers: {
+        "x-appwrite-event": `devices.${gatewayId}.mqtt.message.publish`,
+        "x-appwrite-key": "test-key",
+      },
+      bodyJson: {
+        event: "message.publish",
+        topic: `projects/project-a/devices/AABBCCDDEEFF/telemetry/blocks/${mac}`,
+        payload: bytes.toString("base64"),
+        payload_encoding: "base64",
+      },
+    },
+    res: { json: (body, status) => ({ body, status }) },
     error: (message) => { throw new Error(message); },
   });
 }
@@ -283,6 +318,37 @@ test("complete IMU readings are stored with unified telemetry", async () => {
   ] });
   assert.equal(result.status, 201);
   assert.deepEqual(JSON.parse(rows[0].data.payload).sensors.map((sensor) => sensor.type), [6, 7, 8, 9, 10, 11]);
+});
+
+test("nRF54L15 binary IMU blocks are expanded into time-series points", async () => {
+  const result = await publishImuBlock([
+    { accel: [0.1, -0.2, 9.8], gyro: [0.01, 0.02, -0.03], gyroValid: true },
+    { accel: [0.4, -0.5, 9.7], gyro: [0.04, 0.05, -0.06], gyroValid: false },
+  ]);
+  assert.equal(result.status, 201);
+  assert.equal(result.body.deviceId, remoteId);
+  assert.equal(result.body.blockSequence, 7);
+  assert.equal(result.body.sampleCount, 2);
+  assert.equal(timeseriesWrites.length, 1);
+  const lines = timeseriesWrites[0].data.split("\n");
+  assert.equal(lines.length, 2);
+  assert.match(lines[0], new RegExp(`device_${remoteId},serial=112233445566,channel=blocks,sample_kind=imu,block_sequence=7,sample_index=0`));
+  assert.match(lines[0], /sensor_accel_x=0\.10000000149011612/);
+  assert.match(lines[0], /gyro_valid=true/);
+  assert.match(lines[1], /sample_index=1 .*gyro_valid=false/);
+  const firstTimestamp = BigInt(lines[0].split(" ").at(-1));
+  const secondTimestamp = BigInt(lines[1].split(" ").at(-1));
+  assert.equal(secondTimestamp - firstTimestamp, 15000000000n);
+  assert.equal(rows.length, 0, "blocks belong in history and must not replace latest beacon telemetry");
+});
+
+test("sensor blocks are rejected when the source is not assigned to the publishing gateway", async () => {
+  devices.get(remoteId).gatewayDeviceId = "33333333-3333-4333-8333-333333333333";
+  const result = await publishImuBlock([
+    { accel: [0, 0, 9.8], gyro: [0, 0, 0], gyroValid: true },
+  ]);
+  assert.equal(result.status, 403);
+  assert.equal(timeseriesWrites.length, 0);
 });
 
 test("partial IMU readings are rejected", async () => {

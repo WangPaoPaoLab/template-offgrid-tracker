@@ -19,7 +19,8 @@ import { beaconColorValues, beaconIconColors, beaconIconNames, beaconIconTypes }
 import type { BeaconIconColor, BeaconIconType } from "./beacon-options";
 import { coordinatesFromLocation } from "./mesh-utils";
 import { ProfileLocationPicker } from "./ProfileScreens";
-import { acceptCloudProvisioningRequest, deleteCloudDevice } from "./cloud-auth";
+import { acceptCloudProvisioningRequest, deleteCloudDevice, getCloudSensorHistory } from "./cloud-auth";
+import type { CloudSensorHistorySeries } from "./cloud-auth";
 
 type InboxTab = "channels" | "people" | "gateways" | "sensors" | "discovered";
 type ConversationPeer = { id: string; name: string; serial: string; nodeNum: bigint | null; publicChannel: boolean; device: StoredDevice | null };
@@ -43,6 +44,12 @@ const sensorFields: ReadonlyArray<{ key: keyof EdgezSensorData; label: string; u
   { key: "latitude", label: "Latitude", unit: "°", decimals: 5 },
   { key: "longitude", label: "Longitude", unit: "°", decimals: 5 },
 ];
+const sensorHistoryRanges = [
+  { key: "1h", label: "1H", durationMs: 60 * 60 * 1000 },
+  { key: "6h", label: "6H", durationMs: 6 * 60 * 60 * 1000 },
+  { key: "24h", label: "24H", durationMs: 24 * 60 * 60 * 1000 },
+] as const;
+const sensorChartColors = ["#0a8c87", "#d47a1f", "#7c5ce5", "#d14b78", "#3977c3", "#6c8f2d"];
 
 export function MeshMessages({ visible, profile, profileId, session, meshState, devices, messages, provisioningRequests, cloudSensorSamples, onlineMode, initialPeerSerial, onMessagesChanged, onDevicesChanged, onProvisioningRequestsChanged, onResendMessage, onShowDevice, onRemoveDevice, onClose }: {
   visible: boolean;
@@ -89,6 +96,11 @@ export function MeshMessages({ visible, profile, profileId, session, meshState, 
   const [acceptingRequest, setAcceptingRequest] = useState(false);
   const [resendingUuid, setResendingUuid] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [sensorHistoryRange, setSensorHistoryRange] = useState<(typeof sensorHistoryRanges)[number]["key"]>("1h");
+  const [sensorHistory, setSensorHistory] = useState<CloudSensorHistorySeries[]>([]);
+  const [selectedSensorFields, setSelectedSensorFields] = useState<string[]>([]);
+  const [sensorHistoryLoading, setSensorHistoryLoading] = useState(false);
+  const [sensorHistoryError, setSensorHistoryError] = useState("");
   const [requestName, setRequestName] = useState("");
   const [requestLocationMode, setRequestLocationMode] = useState<"none" | "map" | "live">("none");
   const [requestLocation, setRequestLocation] = useState("");
@@ -119,6 +131,39 @@ export function MeshMessages({ visible, profile, profileId, session, meshState, 
   const samples = sensorNodeNum === null ? [] : onlineMode
     ? onlineSamples.get(sensorNodeNum) ?? []
     : meshState?.sensorSamples.get(sensorNodeNum) ?? [];
+  const activeSensorRange = sensorHistoryRanges.find((range) => range.key === sensorHistoryRange)!;
+  const offlineSensorHistory = useMemo(
+    () => sensorHistoryFromSamples(samples, activeSensorRange.durationMs),
+    [samples, activeSensorRange.durationMs],
+  );
+  const displayedSensorHistory = onlineMode ? sensorHistory : offlineSensorHistory;
+  const selectedHistorySeries = displayedSensorHistory.filter((series) => selectedSensorFields.includes(series.field));
+  const latestSensorTimestamp = samples[samples.length - 1]?.timestampMs ?? 0;
+
+  useEffect(() => {
+    if (!visible || !selectedSensor || !onlineMode) {
+      setSensorHistory([]);
+      setSensorHistoryError("");
+      setSensorHistoryLoading(false);
+      return;
+    }
+    let active = true;
+    setSensorHistoryLoading(true);
+    setSensorHistoryError("");
+    void getCloudSensorHistory(selectedSensor.id, activeSensorRange.durationMs)
+      .then((series) => { if (active) setSensorHistory(series); })
+      .catch((caught) => { if (active) setSensorHistoryError(caught instanceof Error ? caught.message : "Could not load sensor history."); })
+      .finally(() => { if (active) setSensorHistoryLoading(false); });
+    return () => { active = false; };
+  }, [activeSensorRange.durationMs, latestSensorTimestamp, onlineMode, selectedSensor?.id, visible]);
+
+  useEffect(() => {
+    const available = new Set(displayedSensorHistory.map((series) => series.field));
+    setSelectedSensorFields((current) => {
+      const retained = current.filter((field) => available.has(field));
+      return retained.length ? retained : displayedSensorHistory.slice(0, 3).map((series) => series.field);
+    });
+  }, [displayedSensorHistory]);
 
   useEffect(() => {
     let mounted = true;
@@ -447,6 +492,20 @@ export function MeshMessages({ visible, profile, profileId, session, meshState, 
         {selectedSensor ? <>
           <BackButton label="sensors" onPress={closeDetail} />
           <View style={styles.sensorHero}><Ionicons name="pulse-outline" size={28} color="#0a8c87" /><View style={styles.sensorHeroText}><Text style={styles.sensorTitle}>Data statistics</Text><Text style={styles.muted}>{samples.length} received sample{samples.length === 1 ? "" : "s"}</Text></View></View>
+          <View style={styles.sensorChartCard}>
+            <View style={styles.sensorChartHeader}>
+              <View><Text style={styles.sensorChartTitle}>Sensor history</Text><Text style={styles.sensorChartSubtitle}>{selectedHistorySeries.reduce((total, series) => total + series.points.length, 0)} selected readings</Text></View>
+              {sensorHistoryLoading ? <ActivityIndicator size="small" color="#0a8c87" /> : null}
+            </View>
+            <View style={styles.sensorRangeRow}>{sensorHistoryRanges.map((range) => <Pressable key={range.key} style={[styles.sensorRangeButton, sensorHistoryRange === range.key && styles.sensorRangeButtonActive]} onPress={() => setSensorHistoryRange(range.key)} accessibilityRole="button"><Text style={[styles.sensorRangeText, sensorHistoryRange === range.key && styles.sensorRangeTextActive]}>{range.label}</Text></Pressable>)}</View>
+            <View style={styles.sensorPicker}>{displayedSensorHistory.map((series, index) => {
+              const selected = selectedSensorFields.includes(series.field);
+              return <Pressable key={series.field} style={[styles.sensorPickerItem, selected && styles.sensorPickerItemActive]} onPress={() => setSelectedSensorFields((current) => current.includes(series.field) ? current.filter((field) => field !== series.field) : [...current, series.field])} accessibilityRole="checkbox" accessibilityState={{ checked: selected }}><View style={[styles.sensorPickerDot, { backgroundColor: sensorChartColors[index % sensorChartColors.length] }]} /><Text style={styles.sensorPickerText}>{series.label}</Text><Text style={styles.sensorPickerCount}>{series.points.length}</Text></Pressable>;
+            })}</View>
+            <SensorHistoryChart series={selectedHistorySeries} durationMs={activeSensorRange.durationMs} allSeries={displayedSensorHistory} />
+            <View style={styles.sensorChartFooter}><Text>{activeSensorRange.label} ago</Text><Text>Now</Text></View>
+            {sensorHistoryError ? <Text style={styles.error}>{sensorHistoryError}</Text> : null}
+          </View>
           {!samples.length ? <EmptyState icon="analytics-outline" title="No data received yet" text="This device is saved in the profile. Statistics appear when a sensor beacon arrives." /> : <View style={styles.statsGrid}>
             {sensorFields.map((field) => {
               const values = samples.map((sample) => sample.data[field.key]).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
@@ -542,6 +601,67 @@ function sensorSummary(data: EdgezSensorData) {
   return "Sensor sample received";
 }
 
+function sensorFieldName(key: keyof EdgezSensorData) {
+  return `sensor_${String(key).replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)}`;
+}
+
+function sensorHistoryFromSamples(samples: readonly EdgezSensorSample[], durationMs: number): CloudSensorHistorySeries[] {
+  const since = Date.now() - durationMs;
+  return sensorFields.flatMap((field) => {
+    const points = samples.flatMap((sample) => {
+      const value = sample.data[field.key];
+      return sample.timestampMs >= since && typeof value === "number" && Number.isFinite(value)
+        ? [{ timestampMs: sample.timestampMs, value }]
+        : [];
+    });
+    return points.length ? [{ field: sensorFieldName(field.key), label: field.label, points }] : [];
+  });
+}
+
+function SensorHistoryChart({ series, durationMs, allSeries }: {
+  series: CloudSensorHistorySeries[];
+  durationMs: number;
+  allSeries: CloudSensorHistorySeries[];
+}) {
+  const [width, setWidth] = useState(0);
+  const height = 190;
+  const inset = 18;
+  if (!series.length) return <View style={styles.sensorChartEmpty}><Text style={styles.muted}>{allSeries.length ? "Select a sensor field to display." : "No sensor history in this range."}</Text></View>;
+  const values = series.flatMap((item) => item.points.map((point) => point.value));
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const padding = Math.max(0.05, (rawMax - rawMin) * 0.15);
+  const min = rawMin - padding;
+  const max = rawMax + padding;
+  const end = Date.now();
+  const start = end - durationMs;
+  return <View style={styles.sensorChartPlot} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+    {[0, 1, 2, 3].map((line) => <View key={line} style={[styles.sensorChartGridLine, { top: inset + line * (height - inset * 2) / 3 }]} />)}
+    {width > 0 ? series.map((item) => {
+      const colorIndex = Math.max(0, allSeries.findIndex((candidate) => candidate.field === item.field));
+      const color = sensorChartColors[colorIndex % sensorChartColors.length];
+      const sampled = item.points.length <= 160 ? item.points : item.points.filter((_, index) => index % Math.ceil(item.points.length / 160) === 0 || index === item.points.length - 1);
+      const points = sampled.map((point) => ({
+        x: inset + Math.max(0, Math.min(1, (point.timestampMs - start) / durationMs)) * (width - inset * 2),
+        y: inset + (1 - (point.value - min) / (max - min)) * (height - inset * 2),
+      }));
+      return <React.Fragment key={item.field}>
+        {points.slice(1).map((point, index) => {
+          const previous = points[index];
+          const dx = point.x - previous.x;
+          const dy = point.y - previous.y;
+          const length = Math.sqrt(dx * dx + dy * dy);
+          const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+          return <View key={index} style={[styles.sensorChartSegment, { backgroundColor: color, width: length, left: (previous.x + point.x) / 2 - length / 2, top: (previous.y + point.y) / 2 - 1, transform: [{ rotateZ: `${angle}deg` }] }]} />;
+        })}
+        {points.map((point, index) => <View key={`dot-${index}`} style={[styles.sensorChartDot, { backgroundColor: color, left: point.x - 2.5, top: point.y - 2.5 }]} />)}
+      </React.Fragment>;
+    }) : null}
+    <Text style={[styles.sensorChartAxis, { top: 2 }]}>{rawMax.toFixed(2)}</Text>
+    <Text style={[styles.sensorChartAxis, { bottom: 2 }]}>{rawMin.toFixed(2)}</Text>
+  </View>;
+}
+
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: "#f7faf9" },
   header: { minHeight: 84, paddingHorizontal: 22, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: "#dce6e5" },
@@ -558,4 +678,9 @@ const styles = StyleSheet.create({
   infoCard: { padding: 22, borderWidth: 1, borderColor: "#dce6e5", borderRadius: 16, backgroundColor: "white", alignItems: "center", gap: 8 }, infoIcon: { width: 62, height: 62, borderRadius: 31, backgroundColor: "#e9f7f5", alignItems: "center", justifyContent: "center", marginBottom: 4 }, infoTitle: { color: "#0a3037", fontSize: 21, fontWeight: "900" }, infoRow: { width: "100%", minHeight: 48, marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#dce6e5", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }, infoLabel: { color: "#718783", fontSize: 9, fontWeight: "900", letterSpacing: 0.7 }, infoValue: { flex: 1, color: "#0a3037", fontSize: 11, fontWeight: "700", textAlign: "right" },
   setupCard: { padding: 16, borderWidth: 1, borderColor: "#dce6e5", borderRadius: 16, backgroundColor: "white", gap: 11 }, setupTitle: { color: "#0a3037", fontSize: 13, fontWeight: "900", letterSpacing: 0.7 }, setupLabel: { color: "#718783", fontSize: 9, fontWeight: "900", letterSpacing: 0.7, marginTop: 2 }, setupInput: { minHeight: 48, paddingHorizontal: 13, borderWidth: 1, borderColor: "#cedbdc", borderRadius: 11, color: "#0a3037", backgroundColor: "#f7faf9" }, choiceRow: { flexDirection: "row", gap: 7 }, choiceButton: { flex: 1, minHeight: 40, borderWidth: 1, borderColor: "#bcd0cd", borderRadius: 10, alignItems: "center", justifyContent: "center" }, choiceButtonSelected: { borderColor: "#0a8c87", backgroundColor: "#0a8c87" }, choiceText: { color: "#59716f", fontSize: 9, fontWeight: "900" }, choiceTextSelected: { color: "white" }, locationValue: { color: "#59716f", fontSize: 10 }, iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, iconChoice: { width: 40, height: 40, borderWidth: 1, borderColor: "#bcd0cd", borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#f7faf9" }, iconChoiceSelected: { borderColor: "#0a8c87", backgroundColor: "#0a8c87" }, colorRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 }, colorChoice: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: "white" }, colorChoiceSelected: { borderColor: "#0a3037", transform: [{ scale: 1.12 }] }, encryptionNotice: { padding: 10, borderRadius: 10, backgroundColor: "#e9f7f5", flexDirection: "row", alignItems: "center", gap: 8 }, encryptionText: { flex: 1, color: "#385753", fontSize: 10, lineHeight: 14 },
   sensorHero: { padding: 17, borderRadius: 14, backgroundColor: "#e9f7f5", flexDirection: "row", alignItems: "center", gap: 13 }, sensorHeroText: { flex: 1, gap: 3 }, sensorTitle: { color: "#0a3037", fontSize: 18, fontWeight: "900" }, statsGrid: { gap: 9 }, statCard: { padding: 15, borderWidth: 1, borderColor: "#dce6e5", borderRadius: 14, backgroundColor: "white", gap: 5 }, statLabel: { color: "#0a8c87", fontSize: 9, fontWeight: "900", letterSpacing: 0.7 }, statValue: { color: "#0a3037", fontSize: 24, fontWeight: "900" }, statRange: { color: "#718783", fontSize: 9, lineHeight: 14 }, sampleTime: { color: "#718783", fontSize: 9, textAlign: "center", marginTop: 4 },
+  sensorChartCard: { padding: 14, borderWidth: 1, borderColor: "#dce6e5", borderRadius: 16, backgroundColor: "white", gap: 11 },
+  sensorChartHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, sensorChartTitle: { color: "#0a3037", fontSize: 15, fontWeight: "900" }, sensorChartSubtitle: { color: "#718783", fontSize: 9, marginTop: 2 },
+  sensorRangeRow: { flexDirection: "row", gap: 6 }, sensorRangeButton: { minWidth: 46, minHeight: 34, paddingHorizontal: 11, borderWidth: 1, borderColor: "#cedbdc", borderRadius: 9, alignItems: "center", justifyContent: "center" }, sensorRangeButtonActive: { borderColor: "#0a8c87", backgroundColor: "#0a8c87" }, sensorRangeText: { color: "#59716f", fontSize: 9, fontWeight: "900" }, sensorRangeTextActive: { color: "white" },
+  sensorPicker: { flexDirection: "row", flexWrap: "wrap", gap: 6 }, sensorPickerItem: { minHeight: 32, paddingHorizontal: 9, borderWidth: 1, borderColor: "#dce6e5", borderRadius: 9, flexDirection: "row", alignItems: "center", gap: 5, opacity: 0.58 }, sensorPickerItemActive: { borderColor: "#9bcac4", backgroundColor: "#eef9f7", opacity: 1 }, sensorPickerDot: { width: 7, height: 7, borderRadius: 4 }, sensorPickerText: { color: "#385753", fontSize: 9, fontWeight: "800" }, sensorPickerCount: { color: "#718783", fontSize: 8 },
+  sensorChartPlot: { height: 190, overflow: "hidden", borderRadius: 10, backgroundColor: "#f8fbfa" }, sensorChartEmpty: { height: 150, borderRadius: 10, backgroundColor: "#f8fbfa", alignItems: "center", justifyContent: "center", padding: 16 }, sensorChartGridLine: { position: "absolute", left: 18, right: 18, height: StyleSheet.hairlineWidth, backgroundColor: "#dce6e5" }, sensorChartSegment: { position: "absolute", height: 2, borderRadius: 1 }, sensorChartDot: { position: "absolute", width: 5, height: 5, borderRadius: 3 }, sensorChartAxis: { position: "absolute", right: 5, color: "#718783", fontSize: 8 }, sensorChartFooter: { flexDirection: "row", justifyContent: "space-between" },
 });

@@ -15,6 +15,13 @@ const SENSOR_LONGITUDE = 4;
 const SENSOR_ACCELEROMETER = [6, 7, 8];
 const SENSOR_GYROSCOPE = [9, 10, 11];
 const SENSOR_TYPE_MAX = 13;
+const SENSOR_BLOCK_HEADER_SIZE = 24;
+const SENSOR_BLOCK_MAX_SAMPLES = 32;
+const SENSOR_BLOCK_KINDS = new Map([
+  [1, { name: "mcu_temperature", recordSize: 4 }],
+  [2, { name: "imu", recordSize: 25 }],
+  [3, { name: "battery_voltage", recordSize: 4 }],
+]);
 const SENSOR_FIELD_NAMES = new Map([
   [1, "temperature"],
   [2, "humidity"],
@@ -102,6 +109,72 @@ function telemetryLine(target, entry, channel, receivedAt, sequence = 0) {
   }
   const timestamp = BigInt(Date.parse(receivedAt)) * 1000000n + BigInt(sequence);
   return `${escapeMeasurement(measurementForDevice(target.$id))},${tags} ${fields.join(",")} ${timestamp}`;
+}
+
+function blockTopicMac(channel) {
+  const match = /^blocks\/([0-9a-f]{2}(?::[0-9a-f]{2}){5})$/i.exec(channel);
+  return match ? match[1].toUpperCase() : "";
+}
+
+function decodeSensorBlock(encoded, encoding) {
+  if (encoding !== "base64" || typeof encoded !== "string") {
+    throw new Error("Sensor block payload must be base64 encoded");
+  }
+  const bytes = Buffer.from(encoded, "base64");
+  if (bytes.length < SENSOR_BLOCK_HEADER_SIZE || bytes.subarray(0, 4).toString("ascii") !== "EZSB" ||
+      bytes[4] !== 1 || bytes[7] !== SENSOR_BLOCK_HEADER_SIZE) {
+    throw new Error("Sensor block header is invalid");
+  }
+  const kind = SENSOR_BLOCK_KINDS.get(bytes[5]);
+  const samplingIntervalMs = bytes.readUInt32LE(8);
+  const configuredSamples = bytes.readUInt16LE(12);
+  const sampleCount = bytes.readUInt16LE(14);
+  const blockSequence = bytes.readUInt32LE(16);
+  const recordSize = bytes.readUInt16LE(20);
+  if (!kind || recordSize !== kind.recordSize || configuredSamples > SENSOR_BLOCK_MAX_SAMPLES ||
+      sampleCount < 1 || sampleCount > SENSOR_BLOCK_MAX_SAMPLES ||
+      samplingIntervalMs < 1000 || samplingIntervalMs > 3600000 ||
+      bytes.length !== SENSOR_BLOCK_HEADER_SIZE + sampleCount * recordSize) {
+    throw new Error("Sensor block shape is invalid");
+  }
+  const samples = [];
+  for (let index = 0, offset = SENSOR_BLOCK_HEADER_SIZE; index < sampleCount; index += 1, offset += recordSize) {
+    if (bytes[5] === 2) {
+      samples.push({
+        accel_x: bytes.readFloatLE(offset), accel_y: bytes.readFloatLE(offset + 4), accel_z: bytes.readFloatLE(offset + 8),
+        gyro_x: bytes.readFloatLE(offset + 12), gyro_y: bytes.readFloatLE(offset + 16), gyro_z: bytes.readFloatLE(offset + 20),
+        gyro_valid: bytes[offset + 24] === 1,
+      });
+    } else {
+      samples.push({ [kind.name]: bytes.readFloatLE(offset) });
+    }
+  }
+  if (samples.some((sample) => Object.values(sample).some((value) => typeof value === "number" && !Number.isFinite(value)))) {
+    throw new Error("Sensor block contains non-finite samples");
+  }
+  return { kind: kind.name, samplingIntervalMs, configuredSamples, sampleCount, blockSequence, samples };
+}
+
+function blockLines(target, block, receivedAt) {
+  const receivedNs = BigInt(Date.parse(receivedAt)) * 1000000n;
+  return block.samples.map((sample, index) => {
+    const ageMs = BigInt((block.sampleCount - 1 - index) * block.samplingIntervalMs);
+    const timestamp = receivedNs - ageMs * 1000000n;
+    const tags = [
+      `serial=${escapeTag(target.serial)}`,
+      "channel=blocks",
+      `sample_kind=${escapeTag(block.kind)}`,
+      `block_sequence=${block.blockSequence}`,
+      `sample_index=${index}`,
+    ].join(",");
+    const fields = [
+      `sampling_interval_ms=${block.samplingIntervalMs}i`,
+      `configured_samples=${block.configuredSamples}i`,
+      ...Object.entries(sample).map(([name, value]) =>
+        typeof value === "boolean" ? `${name}=${value}` : `sensor_${name}=${value}`),
+    ];
+    return `${escapeMeasurement(measurementForDevice(target.$id))},${tags} ${fields.join(",")} ${timestamp}`;
+  });
 }
 
 async function writeTimeseries(req, lines) {
@@ -368,6 +441,21 @@ async function getDevice(req, deviceId) {
   return response.json();
 }
 
+async function getDeviceByHalowMac(req, halowMac) {
+  const endpoint = process.env.APPWRITE_FUNCTION_API_ENDPOINT.replace(/\/+$/, "");
+  const query = encodeURIComponent(Query.equal("halowMac", [halowMac]));
+  const response = await fetch(`${endpoint}/devices?queries[]=${query}`, {
+    method: "GET",
+    headers: {
+      "x-appwrite-project": process.env.APPWRITE_FUNCTION_PROJECT_ID,
+      "x-appwrite-key": req.headers["x-appwrite-key"],
+    },
+  });
+  if (!response.ok) throw new Error(`Device lookup by HaLow MAC failed with ${response.status}`);
+  const result = await response.json();
+  return Array.isArray(result.devices) && result.devices.length === 1 ? result.devices[0] : null;
+}
+
 async function updateDeviceLocation(req, deviceId, location) {
   const endpoint = process.env.APPWRITE_FUNCTION_API_ENDPOINT.replace(/\/+$/, "");
   const response = await fetch(`${endpoint}/devices/${encodeURIComponent(deviceId)}`, {
@@ -429,6 +517,36 @@ export default async function main({ req, res, error, log = () => {} }) {
   const route = topicParts(topic);
   if (!route || route.projectId !== process.env.APPWRITE_FUNCTION_PROJECT_ID) {
     return json(res, { error: "MQTT topic does not match this Appwrite project" }, 400);
+  }
+
+  const sensorBlockMac = blockTopicMac(route.channel);
+  if (route.channel.startsWith("blocks/")) {
+    if (!sensorBlockMac) return json(res, { error: "Sensor block topic needs a valid HaLow MAC" }, 400);
+    try {
+      const gateway = await getDevice(req, deviceId);
+      if (!gateway || gateway.serial !== route.serial) {
+        return json(res, { error: "MQTT topic serial does not match the Appwrite device" }, 403);
+      }
+      const target = await getDeviceByHalowMac(req, sensorBlockMac);
+      if (!target || target.gatewayDeviceId !== deviceId) {
+        return json(res, { error: "Sensor block source is not assigned to this gateway" }, 403);
+      }
+      const block = decodeSensorBlock(body.payload, body.payload_encoding);
+      const receivedAt = new Date().toISOString();
+      await writeTimeseries(req, blockLines(target, block, receivedAt));
+      return json(res, {
+        accepted: true,
+        deviceId: target.$id,
+        blockSequence: block.blockSequence,
+        sampleCount: block.sampleCount,
+        receivedAt,
+      }, 201);
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      if (message.startsWith("Sensor block")) return json(res, { error: message }, 400);
+      error(message);
+      return json(res, { error: "Could not persist sensor block" }, 500);
+    }
   }
 
   let payload;

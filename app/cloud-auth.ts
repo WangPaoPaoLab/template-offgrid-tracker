@@ -460,6 +460,69 @@ export type CloudOnlineData = {
   discoveries: StoredProvisioningRequest[];
 };
 
+export type CloudSensorHistoryPoint = { timestampMs: number; value: number };
+export type CloudSensorHistorySeries = {
+  field: string;
+  label: string;
+  points: CloudSensorHistoryPoint[];
+};
+
+type TimeseriesRow = { _time?: unknown; _field?: unknown; _value?: unknown };
+
+function measurementForDevice(deviceId: string) {
+  return `device_${deviceId.replace(/[^A-Za-z0-9_-]/g, "_")}`;
+}
+
+function cloudSensorLabel(field: string) {
+  const name = (field.startsWith("sensor_") ? field.slice("sensor_".length) : field).replaceAll("_", " ");
+  return name.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function timeseriesRange(durationMs: number) {
+  if (durationMs <= 60 * 60 * 1000) return "1h";
+  if (durationMs <= 6 * 60 * 60 * 1000) return "6h";
+  return "24h";
+}
+
+/** Query the same per-device Appwrite Time Series Store used by the website. */
+export async function getCloudSensorHistory(deviceId: string, durationMs: number): Promise<CloudSensorHistorySeries[]> {
+  if (!account) throw new Error("Cloud access is not configured in this app build.");
+  const jwt = (await account.createJWT()).jwt;
+  const response = await fetch(`${endpoint}/timeseries/stores/${encodeURIComponent(projectId)}/queries`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-appwrite-project": projectId,
+      "x-appwrite-jwt": jwt,
+    },
+    body: JSON.stringify({
+      measurement: measurementForDevice(deviceId),
+      range: timeseriesRange(durationMs),
+      limit: 2000,
+    }),
+  });
+  const payload = await response.json() as { rows?: TimeseriesRow[]; message?: string };
+  if (!response.ok) throw new Error(payload.message || "Could not query sensor history.");
+  const since = Date.now() - durationMs;
+  const pointsByField = new Map<string, CloudSensorHistoryPoint[]>();
+  for (const row of payload.rows ?? []) {
+    if (typeof row._field !== "string" || !row._field.startsWith("sensor_")) continue;
+    const timestampMs = typeof row._time === "string" ? Date.parse(row._time) : NaN;
+    const value = typeof row._value === "number" ? row._value : Number(row._value);
+    if (!Number.isFinite(timestampMs) || timestampMs < since || !Number.isFinite(value)) continue;
+    const points = pointsByField.get(row._field) ?? [];
+    points.push({ timestampMs, value });
+    pointsByField.set(row._field, points);
+  }
+  return [...pointsByField.entries()]
+    .sort(([left], [right]) => left.localeCompare(right, undefined, { numeric: true }))
+    .map(([field, points]) => ({
+      field,
+      label: cloudSensorLabel(field),
+      points: points.sort((left, right) => left.timestampMs - right.timestampMs),
+    }));
+}
+
 function storedDeviceFromCloud(profileId: string, device: NativeDevice): StoredDevice {
   const firmwareTarget = device.metadata?.firmwareTarget ?? "";
   const gateway = !device.gatewayDeviceId;
