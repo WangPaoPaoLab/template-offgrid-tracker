@@ -366,7 +366,7 @@ test("nRF54L15 binary IMU blocks are expanded into time-series points", async ()
   assert.match(lines[1], /sample_index=1 .*gyro_valid=false/);
   const firstTimestamp = BigInt(lines[0].split(" ").at(-1));
   const secondTimestamp = BigInt(lines[1].split(" ").at(-1));
-  assert.equal(secondTimestamp - firstTimestamp, 80000000n);
+  assert.equal(secondTimestamp - firstTimestamp, 1000000000n);
   assert.notEqual(firstTimestamp, secondTimestamp, "each block sample must append as its own time-series point");
   assert.equal(rows.length, 1, "a block updates the latest row exactly once");
   assert.equal(rows[0].data.channel, "sensors");

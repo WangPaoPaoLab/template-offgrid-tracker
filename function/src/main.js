@@ -195,9 +195,11 @@ function decodeSensorBlock(encoded, encoding) {
 function blockLines(target, block, receivedAt) {
   const receivedNs = BigInt(Date.parse(receivedAt)) * 1000000n;
   return block.samples.map((sample, index) => {
-    const elapsedMs = index * block.samplingIntervalMs;
-    const ageMs = BigInt((block.sampleCount - 1) * block.samplingIntervalMs - elapsedMs);
-    const timestamp = receivedNs - ageMs * 1000000n;
+    // The time-series backend aggregates sub-second timestamps. Keep every
+    // block sample distinct at one-second spacing, ending at receipt time,
+    // while retaining the real sampling period as a field.
+    const ageSeconds = BigInt(block.sampleCount - 1 - index);
+    const timestamp = receivedNs - ageSeconds * 1000000000n;
     const tags = [
       `serial=${escapeTag(target.serial)}`,
       "channel=blocks",
