@@ -360,10 +360,12 @@ test("nRF54L15 binary IMU blocks are expanded into time-series points", async ()
   assert.equal(timeseriesWrites.length, 1);
   const lines = timeseriesWrites[0].data.split("\n");
   assert.equal(lines.length, 2);
-  assert.match(lines[0], new RegExp(`device_${remoteId},serial=112233445566,channel=blocks,sample_kind=imu,block_sequence=7,sample_index=0`));
+  assert.match(lines[0], new RegExp(`device_${remoteId},serial=112233445566,channel=blocks,sample_kind=imu,block_sequence=7 `));
+  assert.doesNotMatch(lines[0], /sample_index/);
   assert.match(lines[0], /sensor_accel_x=0\.10000000149011612/);
   assert.match(lines[0], /gyro_valid=true/);
-  assert.match(lines[1], /sample_index=1 .*gyro_valid=false/);
+  assert.match(lines[1], /gyro_valid=false/);
+  assert.doesNotMatch(lines[1], /sample_index/);
   const firstTimestamp = BigInt(lines[0].split(" ").at(-1));
   const secondTimestamp = BigInt(lines[1].split(" ").at(-1));
   assert.equal(secondTimestamp - firstTimestamp, 1000000000n);
