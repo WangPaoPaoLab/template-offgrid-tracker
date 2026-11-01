@@ -204,7 +204,6 @@ function blockLines(target, block, receivedAt) {
       `serial=${escapeTag(target.serial)}`,
       "channel=blocks",
       `sample_kind=${escapeTag(block.kind)}`,
-      `block_sequence=${block.blockSequence}`,
     ].join(",");
     const fields = [
       `sampling_interval_ms=${block.samplingIntervalMs}i`,
