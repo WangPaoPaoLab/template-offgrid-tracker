@@ -35,6 +35,8 @@ beforeEach(() => {
   delete devices.get(gatewayId).location;
   delete devices.get(remoteId).location;
   devices.get(remoteId).gatewayDeviceId = gatewayId;
+  devices.get(gatewayId).$permissions = ['read("team:profile-a")'];
+  devices.get(remoteId).$permissions = ['read("team:profile-a")'];
   rows.length = 0;
   otaRows.length = 0;
   downlinkRows.length = 0;
@@ -228,15 +230,19 @@ test("one MQTT batch saves each clientId under its own device and permissions", 
   assert.doesNotMatch(timeseriesWrites[0].data, /sensor_gps=/);
 });
 
-test("a gateway cannot write a remote device assigned to another gateway", async () => {
+test("a mesh gateway can relay a remote device in the same access scope", async () => {
   devices.get(remoteId).gatewayDeviceId = "33333333-3333-4333-8333-333333333333";
-  try {
-    const result = await publish([{ clientId: gatewayId }, { clientId: remoteId }]);
-    assert.equal(result.status, 403);
-    assert.equal(rows.length, 0);
-  } finally {
-    devices.get(remoteId).gatewayDeviceId = gatewayId;
-  }
+  const result = await publish([{ clientId: gatewayId }, { clientId: remoteId }]);
+  assert.equal(result.status, 201);
+  assert.equal(rows.length, 2);
+});
+
+test("a gateway cannot relay a remote device outside its access scope", async () => {
+  devices.get(remoteId).gatewayDeviceId = "33333333-3333-4333-8333-333333333333";
+  devices.get(remoteId).$permissions = ['read("team:another-profile")'];
+  const result = await publish([{ clientId: gatewayId }, { clientId: remoteId }]);
+  assert.equal(result.status, 403);
+  assert.equal(rows.length, 0);
 });
 
 test("multiple queued readings remain in time series while TablesDB keeps one latest row per device", async () => {
@@ -344,6 +350,7 @@ test("nRF54L15 binary IMU blocks are expanded into time-series points", async ()
 
 test("sensor blocks are rejected when the source is not assigned to the publishing gateway", async () => {
   devices.get(remoteId).gatewayDeviceId = "33333333-3333-4333-8333-333333333333";
+  devices.get(remoteId).$permissions = ['read("team:another-profile")'];
   const result = await publishImuBlock([
     { accel: [0, 0, 9.8], gyro: [0, 0, 0], gyroValid: true },
   ]);

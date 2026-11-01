@@ -177,6 +177,12 @@ function blockLines(target, block, receivedAt) {
   });
 }
 
+function gatewayCanRelayForTarget(gateway, target) {
+  if (target.$id === gateway.$id || target.gatewayDeviceId === gateway.$id) return true;
+  const gatewayReads = new Set((gateway.$permissions || []).filter((permission) => permission.startsWith("read(")));
+  return (target.$permissions || []).some((permission) => permission.startsWith("read(") && gatewayReads.has(permission));
+}
+
 async function writeTimeseries(req, lines) {
   const endpoint = process.env.APPWRITE_FUNCTION_API_ENDPOINT.replace(/\/+$/, "");
   const projectId = process.env.APPWRITE_FUNCTION_PROJECT_ID;
@@ -528,8 +534,8 @@ export default async function main({ req, res, error, log = () => {} }) {
         return json(res, { error: "MQTT topic serial does not match the Appwrite device" }, 403);
       }
       const target = await getDeviceByHalowMac(req, sensorBlockMac);
-      if (!target || target.gatewayDeviceId !== deviceId) {
-        return json(res, { error: "Sensor block source is not assigned to this gateway" }, 403);
+      if (!target || !gatewayCanRelayForTarget(gateway, target)) {
+        return json(res, { error: "Sensor block source does not share this gateway's access scope" }, 403);
       }
       const block = decodeSensorBlock(body.payload, body.payload_encoding);
       const receivedAt = new Date().toISOString();
@@ -627,8 +633,8 @@ export default async function main({ req, res, error, log = () => {} }) {
       if (!target || target.$id !== targetId) {
         return json(res, { error: "Telemetry clientId does not match an Appwrite device" }, 403);
       }
-      if (targetId !== deviceId && target.gatewayDeviceId !== deviceId) {
-        return json(res, { error: "Remote device is not assigned to this gateway" }, 403);
+      if (!gatewayCanRelayForTarget(device, target)) {
+        return json(res, { error: "Remote device does not share this gateway's access scope" }, 403);
       }
       const readPermissions = (target.$permissions || []).filter((permission) => permission.startsWith("read("));
       if (!readPermissions.length) {
