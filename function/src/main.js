@@ -215,6 +215,29 @@ function blockLines(target, block, receivedAt) {
   });
 }
 
+function latestBlockTelemetry(block) {
+  const sample = block.samples.at(-1);
+  if (block.kind === "imu") {
+    const sensors = [
+      { type: 6, value: sample.accel_x },
+      { type: 7, value: sample.accel_y },
+      { type: 8, value: sample.accel_z },
+    ];
+    if (sample.gyro_valid) {
+      sensors.push(
+        { type: 9, value: sample.gyro_x },
+        { type: 10, value: sample.gyro_y },
+        { type: 11, value: sample.gyro_z },
+      );
+    }
+    return { sensors };
+  }
+  return { sensors: [{
+    type: block.kind === "battery_voltage" ? SENSOR_BATTERY_VOLTAGE : SENSOR_MCU_TEMPERATURE,
+    value: sample[block.kind],
+  }] };
+}
+
 function gatewayCanRelayForTarget(gateway, target) {
   if (target.$id === gateway.$id || target.gatewayDeviceId === gateway.$id) return true;
   const gatewayReads = new Set((gateway.$permissions || []).filter((permission) => permission.startsWith("read(")));
@@ -583,7 +606,27 @@ export default async function main({ req, res, error, log = () => {} }) {
       }
       const block = decodeSensorBlock(body.payload, body.payload_encoding);
       const receivedAt = new Date().toISOString();
+      const readPermissions = (target.$permissions || []).filter((permission) => permission.startsWith("read("));
+      if (!readPermissions.length) {
+        return json(res, { error: "Appwrite device has no owner read permission" }, 409);
+      }
       await writeTimeseries(req, blockLines(target, block, receivedAt));
+      const client = new Client()
+        .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
+        .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
+        .setKey(req.headers["x-appwrite-key"]);
+      const tables = new TablesDB(client);
+      await upsertLatestTelemetry(tables, target, {
+        deviceId: target.$id,
+        profileId: target.metadata?.profileId,
+        gatewayDeviceId: target.$id === gateway.$id ? null : gateway.$id,
+        serial: target.serial,
+        channel: "sensors",
+        topic,
+        payload: JSON.stringify(latestBlockTelemetry(block)),
+        receivedAt,
+        ...mapAppearanceOf(target),
+      }, readPermissions);
       return json(res, {
         accepted: true,
         deviceId: target.$id,

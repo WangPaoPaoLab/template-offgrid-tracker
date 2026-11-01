@@ -367,7 +367,14 @@ test("nRF54L15 binary IMU blocks are expanded into time-series points", async ()
   const firstTimestamp = BigInt(lines[0].split(" ").at(-1));
   const secondTimestamp = BigInt(lines[1].split(" ").at(-1));
   assert.equal(secondTimestamp - firstTimestamp, 80000000n);
-  assert.equal(rows.length, 0, "blocks belong in history and must not replace latest beacon telemetry");
+  assert.notEqual(firstTimestamp, secondTimestamp, "each block sample must append as its own time-series point");
+  assert.equal(rows.length, 1, "a block updates the latest row exactly once");
+  assert.equal(rows[0].data.channel, "sensors");
+  assert.deepEqual(JSON.parse(rows[0].data.payload).sensors, [
+    { type: 6, value: 0.4000000059604645 },
+    { type: 7, value: -0.5 },
+    { type: 8, value: 9.699999809265137 },
+  ], "only the final block sample becomes the latest sensor record");
 });
 
 test("sensor blocks with a corrupt PAwR transport digest are rejected before writing samples", async () => {
