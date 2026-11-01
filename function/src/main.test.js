@@ -171,23 +171,45 @@ async function deleteDevice(deviceId) {
   });
 }
 
-async function publishImuBlock(samples, { mac = "02:11:22:33:44:55", sequence = 7, intervalMs = 15000 } = {}) {
-  const bytes = Buffer.alloc(24 + samples.length * 25);
-  bytes.write("EZSB", 0, "ascii");
-  bytes[4] = 1;
-  bytes[5] = 2;
-  bytes[6] = 1;
-  bytes[7] = 24;
-  bytes.writeUInt32LE(intervalMs, 8);
-  bytes.writeUInt16LE(samples.length, 12);
-  bytes.writeUInt16LE(samples.length, 14);
-  bytes.writeUInt32LE(sequence, 16);
-  bytes.writeUInt16LE(25, 20);
+async function publishImuBlock(samples, {
+  mac = "02:11:22:33:44:55", sequence = 7, intervalMs = 15000, corruptDigest = false,
+} = {}) {
+  const block = Buffer.alloc(24 + samples.length * 25);
+  block.write("EZSB", 0, "ascii");
+  block[4] = 1;
+  block[5] = 2;
+  block[6] = 1;
+  block[7] = 24;
+  block.writeUInt32LE(intervalMs, 8);
+  block.writeUInt16LE(samples.length, 12);
+  block.writeUInt16LE(samples.length, 14);
+  block.writeUInt32LE(sequence, 16);
+  block.writeUInt16LE(25, 20);
   samples.forEach((sample, index) => {
     const offset = 24 + index * 25;
-    [...sample.accel, ...sample.gyro].forEach((value, field) => bytes.writeFloatLE(value, offset + field * 4));
-    bytes[offset + 24] = sample.gyroValid ? 1 : 0;
+    [...sample.accel, ...sample.gyro].forEach((value, field) => block.writeFloatLE(value, offset + field * 4));
+    block[offset + 24] = sample.gyroValid ? 1 : 0;
   });
+  let digest = 0x811c9dc5;
+  for (const byte of block) digest = Math.imul(digest ^ byte, 0x01000193) >>> 0;
+  const bytes = Buffer.alloc(52 + block.length);
+  bytes.write("EZBT", 0, "ascii");
+  bytes[4] = 4;
+  bytes[5] = 7;
+  bytes[6] = 2;
+  bytes[7] = 1;
+  bytes.writeUInt32BE(sequence, 8);
+  bytes.writeUInt32BE(block.length, 12);
+  bytes.writeUInt32BE(0, 16);
+  bytes.writeUInt32BE(corruptDigest ? (digest + 1) >>> 0 : digest, 20);
+  bytes.writeUInt16BE(0, 24);
+  bytes.writeUInt16BE(1, 26);
+  bytes.writeUInt16BE(block.length, 28);
+  bytes.writeUInt16BE(0, 42);
+  bytes.writeUInt16BE(0, 44);
+  bytes[46] = 1;
+  bytes.writeUInt32BE(0xc676b511, 48);
+  block.copy(bytes, 52);
   return main({
     req: {
       headers: {
@@ -346,6 +368,15 @@ test("nRF54L15 binary IMU blocks are expanded into time-series points", async ()
   const secondTimestamp = BigInt(lines[1].split(" ").at(-1));
   assert.equal(secondTimestamp - firstTimestamp, 15000000000n);
   assert.equal(rows.length, 0, "blocks belong in history and must not replace latest beacon telemetry");
+});
+
+test("sensor blocks with a corrupt PAwR transport digest are rejected before writing samples", async () => {
+  const result = await publishImuBlock([
+    { accel: [0.1, -0.2, 9.8], gyro: [0.01, 0.02, -0.03], gyroValid: true },
+  ], { corruptDigest: true });
+  assert.equal(result.status, 400);
+  assert.match(result.body.error, /transport shape/);
+  assert.equal(timeseriesWrites.length, 0);
 });
 
 test("sensor blocks are rejected when the source is not assigned to the publishing gateway", async () => {

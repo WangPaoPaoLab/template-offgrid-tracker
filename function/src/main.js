@@ -17,6 +17,9 @@ const SENSOR_GYROSCOPE = [9, 10, 11];
 const SENSOR_TYPE_MAX = 13;
 const SENSOR_BLOCK_HEADER_SIZE = 24;
 const SENSOR_BLOCK_MAX_SAMPLES = 32;
+const PAWR_BULK_HEADER_SIZE = 52;
+const PAWR_BULK_VERSION = 4;
+const PAWR_BULK_KIND_DATA = 1;
 const SENSOR_BLOCK_KINDS = new Map([
   [1, { name: "mcu_temperature", recordSize: 4 }],
   [2, { name: "imu", recordSize: 25 }],
@@ -116,11 +119,42 @@ function blockTopicMac(channel) {
   return match ? match[1].toUpperCase() : "";
 }
 
+function fnv1a32(bytes) {
+  let digest = 0x811c9dc5;
+  for (const byte of bytes) digest = Math.imul(digest ^ byte, 0x01000193) >>> 0;
+  return digest;
+}
+
+function unwrapPawrBulk(bytes) {
+  if (bytes.length >= 4 && bytes.subarray(0, 4).toString("ascii") === "EZSB") return bytes;
+  if (bytes.length < PAWR_BULK_HEADER_SIZE ||
+      bytes.subarray(0, 4).toString("ascii") !== "EZBT" ||
+      bytes[4] !== PAWR_BULK_VERSION || bytes[7] !== PAWR_BULK_KIND_DATA || bytes[47] !== 0) {
+    throw new Error("Sensor block transport header is invalid");
+  }
+
+  const totalLength = bytes.readUInt32BE(12);
+  const offset = bytes.readUInt32BE(16);
+  const expectedDigest = bytes.readUInt32BE(20);
+  const chunkIndex = bytes.readUInt16BE(24);
+  const chunkCount = bytes.readUInt16BE(26);
+  const dataLength = bytes.readUInt16BE(28);
+  const windowBaseChunk = bytes.readUInt16BE(44);
+  const windowCount = bytes[46];
+  const data = bytes.subarray(PAWR_BULK_HEADER_SIZE);
+  if (offset !== 0 || chunkIndex !== 0 || chunkCount !== 1 || windowBaseChunk !== 0 || windowCount !== 1 ||
+      totalLength !== dataLength || dataLength !== data.length || fnv1a32(data) !== expectedDigest) {
+    throw new Error("Sensor block transport shape is invalid");
+  }
+  return data;
+}
+
 function decodeSensorBlock(encoded, encoding) {
   if (encoding !== "base64" || typeof encoded !== "string") {
     throw new Error("Sensor block payload must be base64 encoded");
   }
-  const bytes = Buffer.from(encoded, "base64");
+  const transport = Buffer.from(encoded, "base64");
+  const bytes = unwrapPawrBulk(transport);
   if (bytes.length < SENSOR_BLOCK_HEADER_SIZE || bytes.subarray(0, 4).toString("ascii") !== "EZSB" ||
       bytes[4] !== 1 || bytes[7] !== SENSOR_BLOCK_HEADER_SIZE) {
     throw new Error("Sensor block header is invalid");
@@ -136,6 +170,9 @@ function decodeSensorBlock(encoded, encoding) {
       samplingIntervalMs < 1000 || samplingIntervalMs > 3600000 ||
       bytes.length !== SENSOR_BLOCK_HEADER_SIZE + sampleCount * recordSize) {
     throw new Error("Sensor block shape is invalid");
+  }
+  if (transport !== bytes && transport[6] !== bytes[5]) {
+    throw new Error("Sensor block transport kind does not match its payload");
   }
   const samples = [];
   for (let index = 0, offset = SENSOR_BLOCK_HEADER_SIZE; index < sampleCount; index += 1, offset += recordSize) {
@@ -515,12 +552,18 @@ export default async function main({ req, res, error, log = () => {} }) {
   if (topic.includes("/system/") || topic.endsWith("/telemetry/status")) {
     return json(res, { accepted: false, reason: "system_status_owned_by_devices" }, 202);
   }
+  const route = topicParts(topic);
   let loggedPayload = body.payload ?? null;
-  if (typeof loggedPayload === "string") {
+  if (route?.channel.startsWith("blocks/") && typeof loggedPayload === "string") {
+    loggedPayload = {
+      encoding: body.payload_encoding ?? null,
+      encodedCharacters: loggedPayload.length,
+      decodedBytes: body.payload_encoding === "base64" ? Buffer.from(loggedPayload, "base64").length : null,
+    };
+  } else if (typeof loggedPayload === "string") {
     try { loggedPayload = JSON.parse(loggedPayload); } catch { /* Log the invalid string below. */ }
   }
   log(JSON.stringify({ mqttDeviceId: deviceId, topic, payload: loggedPayload }));
-  const route = topicParts(topic);
   if (!route || route.projectId !== process.env.APPWRITE_FUNCTION_PROJECT_ID) {
     return json(res, { error: "MQTT topic does not match this Appwrite project" }, 400);
   }
