@@ -490,6 +490,7 @@ export async function getCloudSensorHistory(deviceId: string, durationMs: number
   const jwt = (await account.createJWT()).jwt;
   const response = await fetch(`${endpoint}/timeseries/stores/${encodeURIComponent(projectId)}/queries`, {
     method: "POST",
+    credentials: "omit",
     headers: {
       "content-type": "application/json",
       "x-appwrite-project": projectId,
