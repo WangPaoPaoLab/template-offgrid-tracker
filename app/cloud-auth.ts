@@ -499,7 +499,7 @@ export async function getCloudSensorHistory(deviceId: string, durationMs: number
     body: JSON.stringify({
       measurement: measurementForDevice(deviceId),
       range: timeseriesRange(durationMs),
-      limit: 2000,
+      limit: 1000,
     }),
   });
   const payload = await response.json() as { rows?: TimeseriesRow[]; message?: string };
