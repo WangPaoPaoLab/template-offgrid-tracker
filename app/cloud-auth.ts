@@ -478,12 +478,6 @@ function cloudSensorLabel(field: string) {
   return name.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function timeseriesRange(durationMs: number) {
-  if (durationMs <= 60 * 60 * 1000) return "1h";
-  if (durationMs <= 6 * 60 * 60 * 1000) return "6h";
-  return "24h";
-}
-
 /** Query the same per-device Appwrite Time Series Store used by the website. */
 export async function getCloudSensorHistory(deviceId: string, durationMs: number): Promise<CloudSensorHistorySeries[]> {
   if (!account) throw new Error("Cloud access is not configured in this app build.");
@@ -498,7 +492,7 @@ export async function getCloudSensorHistory(deviceId: string, durationMs: number
     },
     body: JSON.stringify({
       measurement: measurementForDevice(deviceId),
-      range: timeseriesRange(durationMs),
+      duration: Math.max(1, Math.ceil(durationMs / 1000)),
       limit: 1000,
     }),
   });

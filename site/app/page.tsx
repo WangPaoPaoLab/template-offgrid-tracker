@@ -52,12 +52,6 @@ function measurementForDevice(deviceId: string) {
   return `device_${deviceId.replace(/[^A-Za-z0-9_-]/g, "_")}`;
 }
 
-function timeseriesRange(duration: number) {
-  if (duration <= 60 * 60 * 1000) return "1h";
-  if (duration <= 6 * 60 * 60 * 1000) return "6h";
-  return "24h";
-}
-
 async function queryDeviceTimeseries(deviceId: string, duration: number) {
   const jwt = (await account.createJWT()).jwt;
   const response = await fetch(`${endpoint}/timeseries/stores/${encodeURIComponent(projectId)}/queries`, {
@@ -69,7 +63,7 @@ async function queryDeviceTimeseries(deviceId: string, duration: number) {
     },
     body: JSON.stringify({
       measurement: measurementForDevice(deviceId),
-      range: timeseriesRange(duration),
+      duration: Math.max(1, Math.ceil(duration / 1000)),
       limit: 1000,
     }),
   });

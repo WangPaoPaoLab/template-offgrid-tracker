@@ -45,9 +45,9 @@ const sensorFields: ReadonlyArray<{ key: keyof EdgezSensorData; label: string; u
   { key: "longitude", label: "Longitude", unit: "°", decimals: 5 },
 ];
 const sensorHistoryRanges = [
-  { key: "1h", label: "1H", durationMs: 60 * 60 * 1000 },
-  { key: "6h", label: "6H", durationMs: 6 * 60 * 60 * 1000 },
-  { key: "24h", label: "24H", durationMs: 24 * 60 * 60 * 1000 },
+  { key: "5m", label: "5 min", durationMs: 5 * 60 * 1000 },
+  { key: "15m", label: "15 min", durationMs: 15 * 60 * 1000 },
+  { key: "30m", label: "30 min", durationMs: 30 * 60 * 1000 },
 ] as const;
 const sensorChartColors = ["#0a8c87", "#d47a1f", "#7c5ce5", "#d14b78", "#3977c3", "#6c8f2d"];
 
@@ -96,7 +96,7 @@ export function MeshMessages({ visible, profile, profileId, session, meshState, 
   const [acceptingRequest, setAcceptingRequest] = useState(false);
   const [resendingUuid, setResendingUuid] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [sensorHistoryRange, setSensorHistoryRange] = useState<(typeof sensorHistoryRanges)[number]["key"]>("1h");
+  const [sensorHistoryRange, setSensorHistoryRange] = useState<(typeof sensorHistoryRanges)[number]["key"]>("5m");
   const [sensorHistory, setSensorHistory] = useState<CloudSensorHistorySeries[]>([]);
   const [selectedSensorFields, setSelectedSensorFields] = useState<string[]>([]);
   const [sensorHistoryLoading, setSensorHistoryLoading] = useState(false);
