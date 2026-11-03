@@ -42,6 +42,15 @@
 #include "edgez_mesh_relay.h"
 #include "edgez_mesh_zephyr.h"
 #include "edgez_pawr_protocol.h"
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST)
+#include "edgez_pawr_twt.h"
+struct sensor_twt_event {
+	struct edgez_pawr_twt msg;
+	uint8_t peer[6];
+	uint64_t received_us;
+};
+K_MSGQ_DEFINE(sensor_twt_queue, sizeof(struct sensor_twt_event), 8, 8);
+#endif
 #include "edgez_sensor_settings.h"
 #include "edgez_mesh_sae_provider.h"
 #include "edgez_rf_api.h"
@@ -54,7 +63,16 @@
 #define EDGEZ_PAWR_RESPONSE_DOWNLINK_PENDING 0x01U
 #endif
 
-#if defined(CONFIG_OFFGRID_NRF54_MESH_PS_TEST)
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PS_PROBE)
+#include <hal/nrf_gpio.h>
+#include "common/morse_commands.h"
+#include "common/morse_command_utils.h"
+extern enum mmwlan_status mmdrv_execute_command(uint8_t *command,
+	uint8_t *response, uint32_t *response_len);
+#endif
+
+#if defined(CONFIG_OFFGRID_NRF54_MESH_PS_TEST) || \
+	defined(CONFIG_OFFGRID_NRF54_SENSOR_PS_PROBE)
 #include "mmhal_wlan.h"
 #endif
 
@@ -104,6 +122,10 @@ LOG_MODULE_REGISTER(edgez_mesh_join, LOG_LEVEL_INF);
 #define EDGEZ_BUTTON_RESET_HOLD_MS 5000U
 #define EDGEZ_USER_NODE DT_PATH(zephyr_user)
 #define EDGEZ_SENSOR_LED_NODE DT_ALIAS(led0)
+#define EDGEZ_MORSE_WAKE_ACTION_HEADER_LENGTH 29U
+#define EDGEZ_IEEE80211_ACTION_FRAME_CONTROL UINT16_C(0x00d0)
+#define EDGEZ_WLAN_CATEGORY_VENDOR_SPECIFIC 127U
+#define EDGEZ_MORSE_WAKE_ACTION_SUBCATEGORY 1U
 
 #if defined(CONFIG_OFFGRID_NRF54_MESH_PS_TEST)
 #define EDGEZ_PS_BASELINE_MS 30000U
@@ -146,6 +168,11 @@ static const uint8_t sensor_remote_wake_payload[] = {
 	'E', 'Z', 'W', 'A', 'K', 'E', '0', '1'
 };
 static atomic_t sensor_remote_wake_pending;
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_STATE_PROBE)
+static uint8_t sensor_probe_peer_mac[6];
+static atomic_t sensor_probe_peer_seen;
+static atomic_t sensor_probe_wake_count;
+#endif
 static uint32_t sensor_remote_wake_deadline_ms;
 struct sensor_settings_record {
 	uint32_t magic;
@@ -613,6 +640,14 @@ static void join_diagnostic_sink(void *ctx,
 		LOG_INF("[%s] %s", component, message);
 		break;
 	case EDGEZ_DIAGNOSTIC_DEBUG:
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_RX_SLEEP_COMPARE)
+		/* The module compiles at INFO; expose pre-parser RX observations in
+		 * this bounded experiment instead of silently discarding them. */
+		if (strcmp(component, "rx") == 0) {
+			LOG_INF("[%s] %s", component, message);
+			break;
+		}
+#endif
 		LOG_DBG("[%s] %s", component, message);
 		break;
 	case EDGEZ_DIAGNOSTIC_OFF:
@@ -833,6 +868,26 @@ static int join_ignore_unsupported(void *ctx,
 #if defined(CONFIG_OFFGRID_NRF54_ROLE_SENSOR)
 	struct edgez_pawr_bulk_control bulk_control;
 #endif
+	static const uint8_t morse_oui[] = {0x0c, 0xbf, 0x74};
+
+	/* Let the Morse driver's existing BUSY interrupt wake the nRF54, then only
+	 * open the visible wake window after validating the complete native action.
+	 * Normal MM8108 BUSY activity must not be mistaken for an HC33 wake. */
+	if (radio && radio->length == EDGEZ_MORSE_WAKE_ACTION_HEADER_LENGTH +
+			sizeof(sensor_remote_wake_payload) &&
+	    radio->data[0] == (uint8_t)EDGEZ_IEEE80211_ACTION_FRAME_CONTROL &&
+	    radio->data[1] ==
+		(uint8_t)(EDGEZ_IEEE80211_ACTION_FRAME_CONTROL >> 8) &&
+	    radio->data[24] == EDGEZ_WLAN_CATEGORY_VENDOR_SPECIFIC &&
+	    memcmp(radio->data + 25, morse_oui, sizeof(morse_oui)) == 0 &&
+	    radio->data[28] == EDGEZ_MORSE_WAKE_ACTION_SUBCATEGORY &&
+	    memcmp(radio->data + EDGEZ_MORSE_WAKE_ACTION_HEADER_LENGTH,
+		   sensor_remote_wake_payload,
+		   sizeof(sensor_remote_wake_payload)) == 0) {
+		atomic_set(&sensor_remote_wake_pending, 1);
+		k_sem_give(&sensor_remote_wake_sem);
+		return EDGEZ_UMAC_OK;
+	}
 
 	if (!radio || !edgez_pawr_decode_action_frame(
 			radio->data, radio->length, &action)) {
@@ -844,14 +899,44 @@ static int join_ignore_unsupported(void *ctx,
 		if (request.compressed_ssid != mesh_runtime.config.compressed_ssid) {
 			return EDGEZ_UMAC_OK;
 		}
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST)
+		if (sensor_factory_wake_mode && request.type == EDGEZ_PAWR_REQUEST_TWT_CONTROL) {
+			struct sensor_twt_event event = { .received_us = k_ticks_to_us_floor64(k_uptime_ticks()) };
+			static const uint8_t broadcast[6] = {255,255,255,255,255,255};
+			if ((action.source[0] & 1U) == 0 &&
+			    memcmp(action.source, "\0\0\0\0\0\0", 6) != 0 &&
+			    (memcmp(action.destination, broadcast, 6) == 0 ||
+			     memcmp(action.destination, mesh_runtime.radio_info.mac_addr, 6) == 0) &&
+			    edgez_pawr_twt_decode(request.payload, request.payload_length, &event.msg)) {
+				memcpy(event.peer, action.source, 6);
+				(void)k_msgq_put(&sensor_twt_queue, &event, K_NO_WAIT);
+			}
+			return EDGEZ_UMAC_OK;
+		}
+#endif
 		if (request.type == EDGEZ_PAWR_REQUEST_MESH_PACKET) {
 			if (IS_ENABLED(CONFIG_OFFGRID_NRF54_ROLE_SENSOR) &&
 			    request.payload_length ==
 				    sizeof(sensor_remote_wake_payload) &&
 			    memcmp(request.payload, sensor_remote_wake_payload,
 				   sizeof(sensor_remote_wake_payload)) == 0) {
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_STATE_PROBE)
+				/* Publish the observed HC33 peer once; do not invent a BSSID. */
+				if (!atomic_get(&sensor_probe_peer_seen) &&
+				    (action.source[0] & 1U) == 0U &&
+				    memcmp(action.source, "\0\0\0\0\0\0", 6) != 0) {
+					memcpy(sensor_probe_peer_mac, action.source, 6);
+					atomic_set(&sensor_probe_peer_seen, 1);
+				}
+				atomic_inc(&sensor_probe_wake_count);
+#endif
 				atomic_set(&sensor_remote_wake_pending, 1);
 				k_sem_give(&sensor_remote_wake_sem);
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PS_PROBE)
+				LOG_INF("PS_PROBE RX wake request=%u uptime_ms=%u host_released=%u config_accepted=%u",
+					request.request_id, k_uptime_get_32(),
+					sensor_halow_sleep_allowed, sensor_halow_ps_configured);
+#endif
 				return EDGEZ_UMAC_OK;
 			}
 			if (IS_ENABLED(CONFIG_OFFGRID_NRF54_ROLE_SENSOR) &&
@@ -1940,6 +2025,457 @@ static bool set_mesh_power_save(bool enabled)
 #endif
 
 #if defined(CONFIG_OFFGRID_NRF54_SENSOR_HALOW_POWER_SAVE)
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PS_PROBE)
+static bool sensor_long_sleep_active;
+
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_RX_SLEEP_COMPARE)
+static void sensor_probe_read_params(void)
+{
+	static const struct {
+		uint32_t id;
+		const char *name;
+	} params[] = {
+		{MORSE_CMD_PARAM_ID_POWERSAVE_TYPE, "power_save_type"},
+		{MORSE_CMD_PARAM_ID_SNOOZE_DURATION_ADJUST_US, "snooze_adjust_us"},
+		{MORSE_CMD_PARAM_ID_FORCED_SNOOZE_PERIOD_US, "forced_snooze_us"},
+		{MORSE_CMD_PARAM_ID_WAKE_ACTION_GPIO, "wake_action_gpio"},
+		{MORSE_CMD_PARAM_ID_WAKE_ACTION_GPIO_PULSE_MS, "wake_action_pulse_ms"},
+		{MORSE_CMD_PARAM_ID_NON_TIM_MODE, "non_tim_mode"},
+		{MORSE_CMD_PARAM_ID_DYNAMIC_PS_TIMEOUT_MS, "dynamic_ps_timeout_ms"},
+		{MORSE_CMD_PARAM_ID_HOME_CHANNEL_DWELL_MS, "home_channel_dwell_ms"},
+	};
+	const uint16_t scopes[] = {UINT16_MAX, mesh_runtime.umac.vif_id};
+	/* GET only, while the host is awake. Probe both scopes because these
+	 * declarations do not establish whether a parameter is global or per-VIF. */
+	for (size_t s = 0; s < ARRAY_SIZE(scopes); ++s) {
+		for (size_t i = 0; i < ARRAY_SIZE(params); ++i) {
+			struct morse_cmd_req_get_set_generic_param cmd = MORSE_COMMAND_INIT(cmd,
+				MORSE_CMD_ID_GET_SET_GENERIC_PARAM, scopes[s],
+				.param_id = htole32(params[i].id),
+				.action = htole32(MORSE_CMD_PARAM_ACTION_GET));
+			/* Firmware errors can carry extra diagnostic bytes beyond the
+			 * normal 24-byte GET reply. Keep them within a bounded buffer. */
+			struct {
+				struct morse_cmd_resp_get_set_generic_param resp;
+				uint8_t extra[104];
+			} reply = {0};
+			struct morse_cmd_resp_get_set_generic_param *resp = &reply.resp;
+			uint32_t response_len = sizeof(reply);
+			enum mmwlan_status status = mmdrv_execute_command((uint8_t *)&cmd,
+				(uint8_t *)&reply, &response_len);
+			bool valid = (status == MMWLAN_SUCCESS || status == MMWLAN_COMMAND_ERROR) &&
+				response_len >= sizeof(struct morse_cmd_resp) &&
+				response_len <= sizeof(reply) &&
+				le16toh(resp->hdr.message_id) == MORSE_CMD_ID_GET_SET_GENERIC_PARAM &&
+				le16toh(resp->hdr.vif_id) == scopes[s];
+			bool value_valid = valid && status == MMWLAN_SUCCESS &&
+				le32toh(resp->status) == 0U && response_len == sizeof(*resp);
+			LOG_INF("PARAM_GET name=%s id=%u vif=%u sdk=%d response_valid=%u fw=%d bytes=%u value_valid=%u value=%u flags=0x%x",
+				params[i].name, params[i].id, scopes[s], status, valid,
+				(int)(valid ? (int32_t)le32toh(resp->status) : INT32_MIN),
+				response_len, value_valid,
+				value_valid ? le32toh(resp->value) : 0U,
+				value_valid ? le32toh(resp->flags) : 0U);
+		}
+	}
+}
+
+static bool sensor_probe_scan_receive(bool enabled)
+{
+	struct morse_cmd_req_scan_config cmd = MORSE_COMMAND_INIT(cmd,
+		MORSE_CMD_ID_SCAN_CONFIG, UINT16_MAX, .enabled = enabled, .is_survey = 0);
+	struct morse_cmd_resp_scan_config resp = {0};
+	uint32_t response_len = sizeof(resp);
+	enum mmwlan_status status = mmdrv_execute_command((uint8_t *)&cmd,
+		(uint8_t *)&resp, &response_len);
+	bool valid = (status == MMWLAN_SUCCESS || status == MMWLAN_COMMAND_ERROR) &&
+		response_len == sizeof(resp) &&
+		le16toh(resp.hdr.message_id) == MORSE_CMD_ID_SCAN_CONFIG;
+	LOG_INF("RX_COMPARE scan_receive enabled=%u sdk=%d response_valid=%u fw=%d",
+		enabled, status, valid,
+		(int)(valid ? (int32_t)le32toh(resp.status) : INT32_MIN));
+	return valid && status == MMWLAN_SUCCESS && le32toh(resp.status) == 0U;
+}
+
+static bool sensor_probe_monitor(uint16_t *vif_id, bool enabled)
+{
+	struct morse_cmd_req_add_interface add = MORSE_COMMAND_INIT(add,
+		MORSE_CMD_ID_ADD_INTERFACE, UINT16_MAX,
+		.interface_type = htole32(MORSE_CMD_INTERFACE_TYPE_MON));
+	struct morse_cmd_req_remove_interface remove = MORSE_COMMAND_INIT(remove,
+		MORSE_CMD_ID_REMOVE_INTERFACE, *vif_id);
+	struct morse_cmd_resp_add_interface resp = {0};
+	uint32_t response_len = sizeof(resp);
+	memcpy(add.addr.octet, mesh_runtime.radio_info.mac_addr, sizeof(add.addr.octet));
+	add.addr.octet[0] |= 0x02U;
+	add.addr.octet[5] ^= 0x80U;
+	enum mmwlan_status status = mmdrv_execute_command(
+		enabled ? (uint8_t *)&add : (uint8_t *)&remove,
+		(uint8_t *)&resp, &response_len);
+	bool valid = (status == MMWLAN_SUCCESS || status == MMWLAN_COMMAND_ERROR) &&
+		response_len == sizeof(resp) && le16toh(resp.hdr.message_id) ==
+		(enabled ? MORSE_CMD_ID_ADD_INTERFACE : MORSE_CMD_ID_REMOVE_INTERFACE);
+	LOG_INF("RX_COMPARE monitor enabled=%u sdk=%d response_valid=%u fw=%d vif=%u",
+		enabled, status, valid,
+		(int)(valid ? (int32_t)le32toh(resp.status) : INT32_MIN),
+		valid ? le16toh(resp.hdr.vif_id) : UINT16_MAX);
+	if (valid && status == MMWLAN_SUCCESS && le32toh(resp.status) == 0U) {
+		*vif_id = le16toh(resp.hdr.vif_id);
+		return true;
+	}
+	return false;
+}
+#endif
+
+static int sensor_probe_add_station(void *ctx, const uint8_t *mac,
+				   uint16_t *vif_id)
+{
+	ARG_UNUSED(ctx);
+	struct morse_cmd_req_add_interface cmd = MORSE_COMMAND_INIT(cmd,
+		MORSE_CMD_ID_ADD_INTERFACE, UINT16_MAX,
+		.interface_type = htole32(MORSE_CMD_INTERFACE_TYPE_STA));
+	struct morse_cmd_resp_add_interface resp = {0};
+	uint32_t response_len = sizeof(resp);
+	memcpy(cmd.addr.octet, mac, sizeof(cmd.addr.octet));
+	enum mmwlan_status status = mmdrv_execute_command((uint8_t *)&cmd,
+		(uint8_t *)&resp, &response_len);
+	bool valid = (status == MMWLAN_SUCCESS || status == MMWLAN_COMMAND_ERROR) &&
+		response_len == sizeof(resp) &&
+		le16toh(resp.hdr.message_id) == MORSE_CMD_ID_ADD_INTERFACE;
+	LOG_INF("PS_PROBE unassociated STA add sdk=%d response_valid=%u fw=%d",
+		status, valid, (int)(valid ? (int32_t)le32toh(resp.status) : INT32_MIN));
+	if (valid && status == MMWLAN_SUCCESS && le32toh(resp.status) == 0U) {
+		*vif_id = le16toh(resp.hdr.vif_id);
+		return MMWLAN_SUCCESS;
+	}
+	return status == MMWLAN_SUCCESS ? MMWLAN_ERROR : status;
+}
+
+static bool sensor_probe_long_sleep(bool enabled)
+{
+	struct morse_cmd_req_set_long_sleep_config cmd = MORSE_COMMAND_INIT(cmd,
+		MORSE_CMD_ID_SET_LONG_SLEEP_CONFIG, mesh_runtime.umac.vif_id,
+		.enabled = enabled);
+	struct morse_cmd_resp_set_long_sleep_config resp = {0};
+	uint32_t response_len = sizeof(resp);
+	enum mmwlan_status status = mmdrv_execute_command((uint8_t *)&cmd,
+		(uint8_t *)&resp, &response_len);
+	bool valid = (status == MMWLAN_SUCCESS || status == MMWLAN_COMMAND_ERROR) &&
+		response_len == sizeof(resp) &&
+		le16toh(resp.hdr.message_id) == MORSE_CMD_ID_SET_LONG_SLEEP_CONFIG;
+
+	LOG_INF("PS_PROBE LONG_SLEEP enabled=%u sdk=%d response_valid=%u fw=%d",
+		enabled, status, valid,
+		(int)(valid ? (int32_t)le32toh(resp.status) : INT32_MIN));
+	if (!valid || status != MMWLAN_SUCCESS || le32toh(resp.status) != 0U) {
+		return false;
+	}
+	sensor_long_sleep_active = enabled;
+	return true;
+}
+
+static void sensor_probe_sleep_pins(bool awake, unsigned int delay_ms)
+{
+	/* Read the output latch: GPIO input may be disconnected on WAKE. */
+	NRF_GPIO_Type *port = (NRF_GPIO_Type *)DT_REG_ADDR(
+		DT_GPIO_CTLR(DT_NODELABEL(morse_wifi), wakeup_gpios));
+	unsigned int wake_output = (nrf_gpio_port_out_read(port) >>
+		DT_GPIO_PIN(DT_NODELABEL(morse_wifi), wakeup_gpios)) & 1U;
+
+	LOG_INF("PS_PROBE requested_awake=%u wake_output=%u busy=%u after_ms=%u long_sleep=%u uptime_ms=%u",
+		awake, wake_output, mmhal_wlan_busy_is_asserted(), delay_ms,
+		sensor_long_sleep_active, k_uptime_get_32());
+}
+
+static void sensor_probe_dynamic_timeout(void)
+{
+	/* Same request as mmdrv_set_dynamic_ps_timeout(0), retaining the firmware
+	 * response that the driver's errno/status conversion otherwise loses. */
+	struct morse_cmd_req_get_set_generic_param cmd = MORSE_COMMAND_INIT(cmd,
+		MORSE_CMD_ID_GET_SET_GENERIC_PARAM, UINT16_MAX,
+		.param_id = htole32(MORSE_CMD_PARAM_ID_DYNAMIC_PS_TIMEOUT_MS),
+		.action = htole32(MORSE_CMD_PARAM_ACTION_SET), .value = 0);
+	struct morse_cmd_resp_get_set_generic_param resp = {0};
+	uint32_t response_len = sizeof(resp);
+	enum mmwlan_status status = mmdrv_execute_command((uint8_t *)&cmd,
+		(uint8_t *)&resp, &response_len);
+	bool valid = (status == MMWLAN_SUCCESS || status == MMWLAN_COMMAND_ERROR) &&
+		response_len >= sizeof(struct morse_cmd_resp_config_ps) &&
+		response_len <= sizeof(resp) &&
+		le16toh(resp.hdr.message_id) == MORSE_CMD_ID_GET_SET_GENERIC_PARAM;
+
+	LOG_INF("PS_PROBE DYNAMIC_TIMEOUT param=18 value=0 sdk=%d response_valid=%u fw=%d",
+		status, valid, (int)(valid ? (int32_t)le32toh(resp.status) : INT32_MIN));
+}
+
+static bool sensor_probe_config_ps(bool enabled, bool offload)
+{
+	struct morse_cmd_req_config_ps cmd = MORSE_COMMAND_INIT(cmd,
+		MORSE_CMD_ID_CONFIG_PS, mesh_runtime.umac.vif_id,
+		.enabled = enabled, .dynamic_ps_offload = offload);
+	struct morse_cmd_resp_config_ps resp = {0};
+	uint32_t response_len = sizeof(resp);
+	const int64_t started = k_uptime_get();
+	enum mmwlan_status status = mmdrv_execute_command((uint8_t *)&cmd,
+		(uint8_t *)&resp, &response_len);
+	bool valid = (status == MMWLAN_SUCCESS || status == MMWLAN_COMMAND_ERROR) &&
+		response_len == sizeof(resp) &&
+		le16toh(resp.hdr.message_id) == MORSE_CMD_ID_CONFIG_PS;
+
+	LOG_INF("PS_PROBE CONFIG_PS vif=%u enabled=%u offload=%u sdk=%d response_valid=%u fw=%d elapsed_ms=%lld busy=%u",
+		mesh_runtime.umac.vif_id, enabled, offload, status, valid,
+		(int)(valid ? (int32_t)le32toh(resp.status) : INT32_MIN),
+		(long long)(k_uptime_get() - started), mmhal_wlan_busy_is_asserted());
+	return valid && status == MMWLAN_SUCCESS && le32toh(resp.status) == 0U;
+}
+#endif
+
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_PROBE)
+/* Linux Morse ABI GET_TSF (0x28). The SDK does not expose a wrapper.
+ * Fail closed unless the firmware returns the exact documented response. */
+static bool sensor_probe_get_tsf(uint64_t *tsf)
+{
+	struct { struct morse_cmd_header hdr; } cmd =
+		MORSE_COMMAND_INIT(cmd, 0x28, mesh_runtime.umac.vif_id);
+	struct {
+		struct morse_cmd_resp resp;
+		uint8_t timestamps[16];
+		uint8_t extra[96];
+	} reply = {0};
+	uint32_t len = sizeof(reply);
+	enum mmwlan_status sdk = mmdrv_execute_command((uint8_t *)&cmd,
+		(uint8_t *)&reply, &len);
+	bool valid = sdk == MMWLAN_SUCCESS &&
+		len == sizeof(reply.resp) + sizeof(reply.timestamps) &&
+		le16toh(reply.resp.hdr.message_id) == 0x28 &&
+		le16toh(reply.resp.hdr.vif_id) == mesh_runtime.umac.vif_id &&
+		le32toh(reply.resp.status) == 0;
+	*tsf = 0;
+	if (valid) {
+		for (unsigned i = 0; i < 8; ++i) *tsf |= (uint64_t)reply.timestamps[i] << (i * 8);
+	}
+	LOG_INF("TWT_TSF sdk=%d bytes=%u valid=%u tsf=%llu", sdk, len, valid,
+		(unsigned long long)*tsf);
+	return valid;
+}
+
+static bool sensor_probe_twt_at(uint16_t command_id, uint16_t request_type, uint64_t target_tsf)
+{
+	struct morse_cmd_req_twt_agreement_install cmd = MORSE_COMMAND_INIT(cmd,
+		command_id, mesh_runtime.umac.vif_id, .flow_id = 0, .agreement_len = 15);
+	struct morse_cmd_req_twt_agreement_remove remove = MORSE_COMMAND_INIT(remove,
+		MORSE_CMD_ID_TWT_AGREEMENT_REMOVE, mesh_runtime.umac.vif_id, .flow_id = 0);
+	/* Use the SDK's 15-byte layout with caller-selected request-type bits:
+	 * individual, implicit, non-triggered, unprotected, channel 0. Keep the
+	 * zero target for the SDK REQUEST baseline, or an explicit radio TSF for
+	 * negotiation; never substitute MCU uptime. Agreement excludes IE ID/length.
+	 * Period=62500<<request_exponent us; duration=196*256 us. */
+	cmd.agreement[1] = (uint8_t)request_type;
+	cmd.agreement[2] = (uint8_t)(request_type >> 8);
+	for (unsigned i = 0; i < 8; ++i) cmd.agreement[3 + i] = (uint8_t)(target_tsf >> (i * 8));
+	cmd.agreement[11] = 196;
+	cmd.agreement[12] = (uint8_t)62500U;
+	cmd.agreement[13] = (uint8_t)(62500U >> 8);
+	struct {
+		struct morse_cmd_resp_twt_agreement_install resp;
+		uint8_t extra[112];
+	} reply = {0};
+	uint32_t response_len = sizeof(reply);
+	enum mmwlan_status status = mmdrv_execute_command(
+		command_id == MORSE_CMD_ID_TWT_AGREEMENT_REMOVE ?
+			(uint8_t *)&remove : (uint8_t *)&cmd,
+		(uint8_t *)&reply, &response_len);
+	bool valid = (status == MMWLAN_SUCCESS || status == MMWLAN_COMMAND_ERROR) &&
+		response_len >= sizeof(reply.resp) && response_len <= sizeof(reply) &&
+		le16toh(reply.resp.hdr.message_id) == command_id &&
+		le16toh(reply.resp.hdr.vif_id) == mesh_runtime.umac.vif_id;
+	LOG_INF("TWT_PROBE cmd=0x%04x vif=%u flow=0 unannounced=%u req_type=0x%04x target=%llu sdk=%d response_valid=%u fw=%d bytes=%u",
+		command_id, mesh_runtime.umac.vif_id, !!(request_type & BIT(6)), request_type,
+		(unsigned long long)target_tsf, status, valid,
+		(int)(valid ? (int32_t)le32toh(reply.resp.status) : INT32_MIN), response_len);
+	return valid && status == MMWLAN_SUCCESS && le32toh(reply.resp.status) == 0U;
+}
+
+static bool sensor_probe_twt_command_type(uint16_t command_id, uint16_t request_type)
+{
+	return sensor_probe_twt_at(command_id, request_type, 0);
+}
+
+static bool sensor_probe_twt_command(uint16_t command_id, bool unannounced)
+{
+	return sensor_probe_twt_command_type(command_id,
+		BIT(0) | BIT(5) | (4U << 10) | (unannounced ? BIT(6) : 0U));
+}
+
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_STATE_PROBE)
+static bool sensor_probe_sta_state(uint16_t state)
+{
+	struct morse_cmd_req_set_sta_state cmd = MORSE_COMMAND_INIT(cmd,
+		MORSE_CMD_ID_SET_STA_STATE, mesh_runtime.umac.vif_id,
+		.aid = htole16(1), .state = htole16(state));
+	memcpy(cmd.sta_addr, sensor_probe_peer_mac, sizeof(cmd.sta_addr));
+	struct {
+		struct morse_cmd_resp_set_sta_state resp;
+		uint8_t extra[112];
+	} reply = {0};
+	uint32_t len = sizeof(reply);
+	enum mmwlan_status sdk = mmdrv_execute_command((uint8_t *)&cmd,
+		(uint8_t *)&reply, &len);
+	bool valid = (sdk == MMWLAN_SUCCESS || sdk == MMWLAN_COMMAND_ERROR) &&
+		len >= sizeof(reply.resp) && len <= sizeof(reply) &&
+		le16toh(reply.resp.hdr.message_id) == MORSE_CMD_ID_SET_STA_STATE &&
+		le16toh(reply.resp.hdr.vif_id) == mesh_runtime.umac.vif_id;
+	LOG_INF("TWT_STATE set state=%u aid=1 peer=%02x:%02x:%02x:%02x:%02x:%02x sdk=%d response_valid=%u fw=%d bytes=%u",
+		state, sensor_probe_peer_mac[0], sensor_probe_peer_mac[1],
+		sensor_probe_peer_mac[2], sensor_probe_peer_mac[3],
+		sensor_probe_peer_mac[4], sensor_probe_peer_mac[5], sdk, valid,
+		(int)(valid ? (int32_t)le32toh(reply.resp.status) : INT32_MIN), len);
+	return valid && sdk == MMWLAN_SUCCESS && le32toh(reply.resp.status) == 0U;
+}
+
+static bool sensor_probe_twt_states(void)
+{
+	/* Recreate the VIF between candidates so a rejected install cannot leave
+	 * hidden agreement state affecting the next test. No on-air association. */
+	const struct edgez_rf_backend_ops *driver = mesh_runtime.umac.driver;
+	void *ctx = mesh_runtime.umac.driver_ctx;
+	for (uint16_t target = 0; target <= 4; ++target) {
+		if (target != 0 && !atomic_get(&sensor_probe_peer_seen)) {
+			LOG_ERR("TWT_STATE no validated HC33 peer observed; skipping manual states");
+			return false;
+		}
+		LOG_INF("TWT_STATE stage START target=%u req_type=0x1020", target);
+		if (mmdrv_set_wake_enabled(true) != MMWLAN_SUCCESS) {
+			return false;
+		}
+		int removed = driver->remove_interface(ctx, mesh_runtime.umac.vif_id);
+		LOG_INF("TWT_STATE reset remove_vif=%u rc=%d", mesh_runtime.umac.vif_id, removed);
+		if (removed != 0) {
+			return false;
+		}
+		uint16_t vif = UINT16_MAX;
+		if (sensor_probe_add_station(ctx, mesh_runtime.radio_info.mac_addr, &vif) != 0) {
+			return false;
+		}
+		mesh_runtime.umac.vif_id = vif;
+		int channel = driver->set_channel(ctx, &mesh_runtime.config.channel);
+		int bss = driver->configure_bss(ctx, vif, mesh_runtime.config.beacon_interval_tu,
+			mesh_runtime.config.dtim_period, mesh_runtime.config.compressed_ssid);
+		LOG_INF("TWT_STATE reset vif=%u channel_rc=%d bss_rc=%d", vif, channel, bss);
+		if (channel != 0 || bss != 0 || !sensor_probe_long_sleep(false) ||
+		    !sensor_probe_config_ps(true, false)) {
+			return false;
+		}
+		for (uint16_t state = 1; state <= target; ++state) {
+			if (!sensor_probe_sta_state(state)) {
+				LOG_WRN("TWT_STATE transition rejected target=%u state=%u; stopping chain", target, state);
+				return false;
+			}
+		}
+		bool validated = sensor_probe_twt_command_type(MORSE_CMD_ID_TWT_AGREEMENT_VALIDATE, 0x1020);
+		/* Linux FORCE_INSTALL does not gate INSTALL on VALIDATE. */
+		bool installed = sensor_probe_twt_command_type(MORSE_CMD_ID_TWT_AGREEMENT_INSTALL, 0x1020);
+		LOG_INF("TWT_STATE result target=%u validated=%u installed=%u", target, validated, installed);
+		if (installed) {
+			uint64_t tsf;
+			(void)sensor_probe_get_tsf(&tsf);
+			atomic_val_t before = atomic_get(&sensor_probe_wake_count);
+			LOG_INF("TWT_STATE window START target=%u duration_ms=10000 monitor=0 scan=0 long_sleep=0", target);
+			if (mmdrv_set_wake_enabled(false) != MMWLAN_SUCCESS) {
+				return false;
+			}
+			k_msleep(10000);
+			sensor_probe_sleep_pins(false, 10000);
+			if (mmdrv_set_wake_enabled(true) != MMWLAN_SUCCESS) {
+				return false;
+			}
+			bool cleanup = sensor_probe_twt_command_type(MORSE_CMD_ID_TWT_AGREEMENT_REMOVE, 0x1020);
+			LOG_INF("TWT_STATE window END target=%u decoded=%ld removed=%u", target,
+				(long)(atomic_get(&sensor_probe_wake_count) - before), cleanup);
+			if (!cleanup) {
+				return false;
+			}
+		}
+	}
+	LOG_INF("TWT_STATE all stages complete; requesting full radio shutdown to clear test context");
+	/* Caller uses the existing radio-off path, discarding all artificial state. */
+	return false;
+}
+#endif
+
+static bool sensor_probe_twt(void)
+{
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_STATE_PROBE)
+	static bool state_probe_ran;
+	if (!state_probe_ran) {
+		state_probe_ran = true;
+		return sensor_probe_twt_states();
+	}
+	return true;
+#endif
+	if (!sensor_probe_long_sleep(false)) {
+		return false;
+	}
+	/* Validate both before a potentially stateful install. The first hardware
+	 * run already rejected announced INSTALL; try unannounced first here. */
+	bool validated[2];
+	for (unsigned int mode = 0; mode < 2U; ++mode) {
+		validated[mode] = sensor_probe_twt_command(MORSE_CMD_ID_TWT_AGREEMENT_VALIDATE, mode != 0);
+	}
+	for (unsigned int variant = 0; variant < 2U; ++variant) {
+		unsigned int mode = 1U - variant;
+		bool valid = validated[mode];
+		bool installed = false;
+		if (valid) {
+			installed = sensor_probe_twt_command(MORSE_CMD_ID_TWT_AGREEMENT_INSTALL, mode != 0);
+		}
+		if (!installed) {
+			LOG_WRN("TWT_PROBE skipped window unannounced=%u validated=%u installed=0", mode, valid);
+			/* Installation may have taken effect even if its reply was lost.
+			 * Shut down after any failed install instead of leaving ambiguous state. */
+			if (valid) {
+				(void)sensor_probe_twt_command(MORSE_CMD_ID_TWT_AGREEMENT_REMOVE, mode != 0);
+				return false;
+			}
+			continue;
+		}
+		LOG_INF("TWT_PROBE window START unannounced=%u duration_ms=10000 monitor=0 scan=0 long_sleep=0", mode);
+		enum mmwlan_status release = mmdrv_set_wake_enabled(false);
+		if (release != MMWLAN_SUCCESS) {
+			(void)sensor_probe_twt_command(MORSE_CMD_ID_TWT_AGREEMENT_REMOVE, mode != 0);
+			return false;
+		}
+		/* RAM counters avoid frequent RTT writes perturbing this observation.
+		 * These pin samples cannot establish RF sleep or a TWT service period. */
+		unsigned int busy_samples = 0;
+		unsigned int busy_transitions = 0;
+		bool previous_busy = mmhal_wlan_busy_is_asserted();
+		for (unsigned int sample = 0; sample < 100U; ++sample) {
+			k_msleep(100);
+			bool busy = mmhal_wlan_busy_is_asserted();
+			busy_samples += busy;
+			busy_transitions += busy != previous_busy;
+			previous_busy = busy;
+		}
+		sensor_probe_sleep_pins(false, 10000);
+		enum mmwlan_status wake = mmdrv_set_wake_enabled(true);
+		bool removed = sensor_probe_twt_command(MORSE_CMD_ID_TWT_AGREEMENT_REMOVE, mode != 0);
+		LOG_INF("TWT_PROBE window END unannounced=%u busy_samples=%u/100 transitions=%u wake_sdk=%d removed=%u",
+			mode, busy_samples, busy_transitions, wake, removed);
+		if (wake != MMWLAN_SUCCESS || !removed) {
+			return false;
+		}
+	}
+	atomic_clear(&sensor_remote_wake_pending);
+	k_sem_reset(&sensor_remote_wake_sem);
+	return true;
+}
+#endif
+
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST)
+#include "sensor_twt_pawr_test.inc"
+#endif
+
 static bool sensor_configure_halow_power_save(void)
 {
 	/* CONFIG_PS is required once to let the MM8108 firmware deassert BUSY. It
@@ -1947,6 +2483,85 @@ static bool sensor_configure_halow_power_save(void)
 	 * mesh VIF does not run. Configure it explicitly once after radio startup,
 	 * then use only the cheap host-wake toggle for subsequent report cycles. */
 	enum mmwlan_status status = mmdrv_set_dynamic_ps_timeout(0U);
+
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PS_PROBE)
+	if (sensor_factory_wake_mode) {
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST)
+		return sensor_twt_pawr_test();
+#endif
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_RX_SLEEP_COMPARE)
+		if (!sensor_probe_config_ps(false, false)) {
+			return false;
+		}
+		LOG_INF("RX_COMPARE awake control START duration_ms=10000");
+		k_msleep(10000);
+		sensor_probe_sleep_pins(true, 10000);
+		LOG_INF("RX_COMPARE awake control END");
+		uint16_t monitor_vif = UINT16_MAX;
+		if (sensor_probe_monitor(&monitor_vif, true)) {
+			bool scanning = sensor_probe_scan_receive(true);
+			int channel_status = mesh_runtime.umac.driver->set_channel(
+				mesh_runtime.umac.driver_ctx, &mesh_runtime.config.channel);
+			LOG_INF("RX_COMPARE broad scan=%u channel_reapply=%d", scanning, channel_status);
+			LOG_INF("RX_COMPARE broad monitor START duration_ms=10000");
+			k_msleep(10000);
+			bool scan_stopped = !scanning || sensor_probe_scan_receive(false);
+			bool monitor_removed = sensor_probe_monitor(&monitor_vif, false);
+			if (!scan_stopped || !monitor_removed) {
+				LOG_ERR("RX_COMPARE broad RX cleanup failed; forcing radio shutdown");
+				return false;
+			}
+			LOG_INF("RX_COMPARE broad monitor END");
+		} else {
+			LOG_WRN("RX_COMPARE broad monitor rejected; retaining STA filter");
+			k_msleep(10000);
+		}
+#endif
+		LOG_INF("PS_PROBE dynamic_timeout_ms=0 sdk=%d; testing CONFIG_PS independently",
+			status);
+		sensor_probe_dynamic_timeout();
+		/* Run only from the application thread: synchronous commands in an
+		 * RX callback would prevent the driver from consuming the response. */
+		(void)sensor_probe_config_ps(true, true);
+		if (!sensor_probe_config_ps(false, false)) {
+			LOG_ERR("PS_PROBE reset rejected; skipping candidate");
+			return false;
+		}
+		sensor_halow_ps_configured = sensor_probe_config_ps(true, false);
+		if (!sensor_halow_ps_configured) {
+			/* Test the accepted SDK mode if the experimental split is rejected.
+			 * The optional dynamic-timeout failure must not hide this result. */
+			sensor_halow_ps_configured = sensor_probe_config_ps(true, true);
+			LOG_INF("PS_PROBE selected offload=1 accepted=%u",
+				sensor_halow_ps_configured);
+			if (!sensor_halow_ps_configured) {
+				(void)sensor_probe_config_ps(false, false);
+			}
+		} else {
+			LOG_INF("PS_PROBE selected offload=0 accepted=1");
+		}
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_RX_SLEEP_COMPARE)
+		if (sensor_halow_ps_configured) {
+			LOG_INF("RX_COMPARE ordinary PS START duration_ms=10000");
+			(void)mmdrv_set_wake_enabled(false);
+			k_msleep(10000);
+			sensor_probe_sleep_pins(false, 10000);
+			(void)mmdrv_set_wake_enabled(true);
+			LOG_INF("RX_COMPARE ordinary PS END; running awake command probes");
+			atomic_clear(&sensor_remote_wake_pending);
+			k_sem_reset(&sensor_remote_wake_sem);
+			sensor_probe_read_params();
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_PROBE)
+			if (!sensor_probe_twt()) {
+				LOG_WRN("TWT_PROBE requested radio shutdown; clearing experimental context");
+				return false;
+			}
+#endif
+		}
+#endif
+		return sensor_halow_ps_configured;
+	}
+#endif
 
 	if (status == MMWLAN_SUCCESS) {
 		status = mmdrv_set_chip_power_save_enabled(
@@ -1963,6 +2578,13 @@ static bool sensor_configure_halow_power_save(void)
 
 static bool sensor_set_halow_wake(bool awake)
 {
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PS_PROBE)
+	if (!awake && sensor_factory_wake_mode &&
+	    !sensor_probe_long_sleep(true)) {
+		LOG_ERR("long sleep rejected; refusing receiver-on sleep fallback");
+		return false;
+	}
+#endif
 	enum mmwlan_status status = mmdrv_set_wake_enabled(awake);
 
 	if (status != MMWLAN_SUCCESS) {
@@ -1970,7 +2592,24 @@ static bool sensor_set_halow_wake(bool awake)
 			awake ? "wake" : "sleep", status);
 		return false;
 	}
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PS_PROBE)
+	if (awake && sensor_long_sleep_active && !sensor_probe_long_sleep(false)) {
+		return false;
+	}
+#endif
 	sensor_halow_sleep_allowed = !awake;
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PS_PROBE)
+	if (sensor_factory_wake_mode) {
+		/* No firmware command here: let the driver settle, then sample the
+		 * GPIO without asserting WAKE. BUSY low is not a current measurement. */
+		k_msleep(250);
+		sensor_probe_sleep_pins(awake, 250);
+		if (!awake) {
+			k_msleep(750);
+			sensor_probe_sleep_pins(awake, 1000);
+		}
+	}
+#endif
 	return true;
 }
 #endif
@@ -2198,6 +2837,9 @@ static int stop_mesh_profile(bool clear_routes)
 	mesh_secure = false;
 	sensor_radio_only = false;
 	mesh_started = false;
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PS_PROBE)
+	sensor_long_sleep_active = false;
+#endif
 	edgez_config_set_halow_ready(false);
 	edgez_config_set_halow_link(false);
 	return EDGEZ_UMAC_OK;
@@ -2388,6 +3030,14 @@ static int start_sensor_radio(const struct edgez_halow_profile *profile)
 		.secure = false,
 		.events = join_events,
 	};
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PS_PROBE)
+	if (sensor_factory_wake_mode) {
+		static struct edgez_rf_backend_ops station_probe_ops;
+		station_probe_ops = *config.radio;
+		station_probe_ops.add_mesh_interface = sensor_probe_add_station;
+		config.radio = &station_probe_ops;
+	}
+#endif
 	memcpy(config.country_code, profile->country_code, 2U);
 	config.country_code[2] = '\0';
 	memcpy(config.mesh_id, profile->mesh_id, mesh_id_length);
@@ -2587,7 +3237,7 @@ static void sensor_finish_cycle(uint32_t now)
 #endif
 	LOG_INF("sensor cycle complete; HaLow %s for %u ms",
 #if defined(CONFIG_OFFGRID_NRF54_SENSOR_HALOW_POWER_SAVE)
-		sensor_halow_sleep_allowed ? "chip sleep" : "off",
+		sensor_halow_sleep_allowed ? "host wake released (RF sleep unverified)" : "off",
 #else
 		"off",
 #endif
@@ -2823,14 +3473,14 @@ static void sensor_power_tick(const struct edgez_halow_profile *profile,
 		 * channel and uses MM8108 chip sleep between reports. */
 		bool keep_radio = sensor_factory_wake_mode ||
 			(!provisioning_cycle && edgez_config_should_autostart());
-		bool ps_ready = sensor_factory_wake_mode ||
-			(keep_radio && (sensor_halow_ps_configured ||
-			 sensor_configure_halow_power_save()));
-		/* Keep the receiver continuously awake in the HC33 diagnostic. Once
-		 * end-to-end RX is proven this can be replaced by duty-cycled windows. */
-		const bool keep_awake_for_verify = sensor_factory_wake_mode;
-		if (!ps_ready ||
-		    (!keep_awake_for_verify && !sensor_set_halow_wake(false))) {
+		bool chip_ps_ready = keep_radio && (sensor_halow_ps_configured ||
+			sensor_configure_halow_power_save());
+		bool host_sleep_ready = false;
+
+		if (chip_ps_ready) {
+			host_sleep_ready = sensor_set_halow_wake(false);
+		}
+		if (!host_sleep_ready) {
 			LOG_WRN("sensor HaLow power save failed; cutting rail");
 			int stop_rc = stop_mesh_profile(true);
 
@@ -2954,8 +3604,7 @@ int main(void)
 					sensor_led_set_awake(false);
 #endif
 #if defined(CONFIG_OFFGRID_NRF54_SENSOR_HALOW_POWER_SAVE)
-					if (!sensor_factory_wake_mode && mesh_started &&
-					    !sensor_halow_sleep_allowed) {
+					if (mesh_started && !sensor_halow_sleep_allowed) {
 						(void)sensor_set_halow_wake(false);
 					}
 #endif

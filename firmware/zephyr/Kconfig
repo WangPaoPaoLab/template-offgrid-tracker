@@ -95,6 +95,63 @@ config OFFGRID_NRF54_SENSOR_HALOW_POWER_SAVE
       rail and SPI remain enabled, so compare average energy and wake latency
       against full rail cutoff rather than expecting the lowest sleep current.
 
+config OFFGRID_NRF54_SENSOR_PS_PROBE
+    bool "Probe retained sleep on the factory stateless wake-test profile"
+    depends on OFFGRID_NRF54_SENSOR_HALOW_POWER_SAVE
+    default n
+    help
+      Use an unassociated STA interface for the edgez-wake-test factory profile,
+      compare CONFIG_PS modes, and enter/exit firmware long sleep between
+      reports. No AP handshake is performed. Logs command status, WAKE output,
+      and BUSY when logging is enabled. Disable logging and detach the debugger
+      for current measurement. RF wake reception is not established in this mode.
+
+config OFFGRID_NRF54_SENSOR_RX_SLEEP_COMPARE
+    bool "Compare awake, ordinary PS, and long-sleep reception once at boot"
+    depends on OFFGRID_NRF54_SENSOR_PS_PROBE && LOG
+    default n
+    help
+      Hold the factory test radio awake for ten seconds, try an additional
+      monitor interface for ten seconds, then release host wake with ordinary
+      PS for ten seconds before entering long sleep. Remove the monitor before
+      sleeping, or shut down the radio if its removal fails.
+      Received test wakes are discarded before the normal sensor loop resumes.
+      Read power-save and wake parameters in global and station scope while
+      the host is awake, without writing their values.
+
+config OFFGRID_NRF54_SENSOR_TWT_PROBE
+    bool "Probe raw TWT agreements on the unassociated factory STA"
+    depends on OFFGRID_NRF54_SENSOR_RX_SLEEP_COMPARE
+    default n
+    help
+      Validate and attempt to install flow 0 with one-second intervals and
+      50.176 ms minimum wake duration. Compare announced and unannounced
+      requests without AP association. Observe each for ten seconds with
+      long sleep disabled, then remove the agreement. A failed cleanup
+      forces radio shutdown. This does not establish a working RF schedule.
+
+config OFFGRID_NRF54_SENSOR_TWT_STATE_PROBE
+    bool "Compare raw TWT installation across manual station states"
+    depends on OFFGRID_NRF54_SENSOR_TWT_PROBE
+    default n
+    help
+      Use Linux force-install request encoding and a fresh STA VIF at each
+      stage. Learn the peer MAC from a validated factory wake request, then
+      compare no peer, NONE, AUTHENTICATED, ASSOCIATED and AUTHORIZED with
+      test AID 1. Stop on rejected transitions. No on-air association is
+      performed. Run once per boot and clear context via radio shutdown.
+
+config OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST
+    bool "Negotiate a bounded experimental TWT schedule over PAwR"
+    depends on OFFGRID_NRF54_SENSOR_TWT_STATE_PROBE
+    default n
+    help
+      Factory-only one-shot experiment with HC33. Bootstrap using monitor RX,
+      authorize the peer locally, query radio TSF, negotiate and install flow 0.
+      Remove monitor/scan before a 30-second lease. Never use long sleep with
+      TWT. Reject stale/mismatched replies and excessive timing uncertainty.
+      Shut down the radio at expiry or failure. Does not prove RF sleep.
+
 config OFFGRID_NRF54_SENSOR_PAWR_BULK_TEST
     bool "Run the connectionless PAwR bulk-transfer test"
     depends on OFFGRID_NRF54_ROLE_SENSOR

@@ -4,7 +4,12 @@
 #include <string.h>
 
 #include "driver/gpio.h"
+#include "driver/uart.h"
 #include "edgez_pawr_protocol.h"
+#include "edgez_pawr_twt.h"
+#include "esp_timer.h"
+#include "esp_random.h"
+#include "freertos/queue.h"
 #include "edgez_rf_api.h"
 #include "edgez_umac.h"
 #include "esp_err.h"
@@ -33,10 +38,158 @@ static uint16_t sequence_number;
 static uint32_t request_id;
 static uintptr_t tx_token;
 
+struct twt_rx_event {
+    struct edgez_pawr_twt msg;
+    uint8_t peer[6];
+    uint64_t received_us;
+};
+static QueueHandle_t twt_queue;
+static struct edgez_pawr_twt schedule;
+static uint8_t twt_peer[6];
+static uint64_t offer_received_us, window_start_us, expires_us;
+static bool twt_pending, twt_active, twt_auto, twt_outside;
+static uint32_t twt_session, test_sequence;
+static int32_t phase_adjust_us;
+static struct edgez_pawr_twt_clock pace_clock;
+static uint64_t pending_probe_us;
+static uint32_t pending_probe_sequence;
+static int32_t pending_probe_adjust;
+static unsigned missing_feedback;
+
+static void twt_resync(const char *reason);
+
 static void receive_frame(void *ctx, const struct edgez_umac_rx_frame *frame)
 {
     (void)ctx;
-    (void)frame;
+    struct edgez_pawr_action_view action;
+    struct edgez_pawr_request_view request;
+    struct twt_rx_event event = { .received_us = esp_timer_get_time() };
+    if (!frame || !twt_queue ||
+        !edgez_pawr_decode_action_frame(frame->data, frame->length, &action) ||
+        !edgez_pawr_decode_request(action.payload, action.payload_length, &request) ||
+        request.type != EDGEZ_PAWR_REQUEST_TWT_CONTROL ||
+        request.compressed_ssid != edgez_pawr_compress_ssid(
+            (const uint8_t *)WAKE_TEST_SSID, strlen(WAKE_TEST_SSID)) ||
+        (action.source[0] & 1U) || !memcmp(action.source, "\0\0\0\0\0\0", 6) ||
+        (memcmp(action.destination, radio_info.mac_addr, 6) &&
+         memcmp(action.destination, broadcast_mac, 6)) ||
+        !edgez_pawr_twt_decode(request.payload, request.payload_length, &event.msg)) return;
+    memcpy(event.peer, action.source, 6);
+    (void)xQueueSend(twt_queue, &event, 0);
+}
+
+static bool send_twt(const struct edgez_pawr_twt *msg, const uint8_t peer[6])
+{
+    uint8_t payload[EDGEZ_PAWR_TWT_LENGTH];
+    uint8_t packet[EDGEZ_PAWR_HEADER_LENGTH + sizeof(payload)];
+    uint8_t frame[EDGEZ_PAWR_ACTION_HEADER_LENGTH + sizeof(packet)];
+    size_t packet_length, frame_length;
+    if (!edgez_pawr_twt_encode(payload, sizeof(payload), msg) ||
+        !edgez_pawr_encode_typed_request(packet, sizeof(packet), EDGEZ_PAWR_REQUEST_TWT_CONTROL,
+            ++request_id, 0, edgez_pawr_compress_ssid((const uint8_t *)WAKE_TEST_SSID,
+            strlen(WAKE_TEST_SSID)), payload, sizeof(payload), &packet_length) ||
+        !edgez_pawr_encode_action_frame(frame, sizeof(frame), sequence_number++,
+            radio_info.mac_addr, peer, packet, packet_length, &frame_length)) return false;
+    const struct edgez_umac_tx_request tx = {
+        .token = ++tx_token, .frame = frame, .frame_length = frame_length,
+        .frame_type = EDGEZ_UMAC_TX_MANAGEMENT, .tid = 8, .mcs = 0,
+        .attempts = 1, .bandwidth_mhz = 1, .no_ack = true, .immediate_status = true,
+    };
+    return edgez_umac_transmit(&wake_umac, &tx) == EDGEZ_UMAC_OK;
+}
+
+static void twt_receive_pending(void)
+{
+    struct twt_rx_event event;
+    while (xQueueReceive(twt_queue, &event, 0) == pdTRUE) {
+        struct edgez_pawr_twt *msg = &event.msg;
+        if (msg->session != twt_session) continue;
+        if (msg->kind == EDGEZ_PAWR_TWT_HIT) {
+            if (!twt_active || !pending_probe_us || memcmp(event.peer, twt_peer, 6) ||
+                !edgez_pawr_twt_same_schedule(&schedule, msg) ||
+                msg->round_trip_us != schedule.round_trip_us ||
+                msg->sequence != pending_probe_sequence || msg->echo_host_us != pending_probe_us)
+                continue;
+            uint64_t elapsed = event.received_us - pending_probe_us;
+            pending_probe_us = 0; /* Duplicate/reordered responses cannot update twice. */
+            if (elapsed <= msg->processing_us || elapsed - msg->processing_us > 30000) {
+                if (++missing_feedback >= 4) twt_resync("four unusable round trips");
+                continue;
+            }
+            uint32_t rtt = (uint32_t)(elapsed - msg->processing_us);
+            expires_us = event.received_us + (uint64_t)schedule.lease_ms * 1000;
+            bool updated = edgez_pawr_twt_clock_update(&pace_clock, pending_probe_adjust,
+                                                      msg->phase_error_us, rtt);
+            missing_feedback = 0;
+            if (updated) phase_adjust_us = pace_clock.phase_adjust_us;
+            ESP_LOGI(TAG, "PAWR_TWT STATS sequence=%lu rtt_us=%lu error_us=%ld samples=%u good=%u min_rtt_us=%lu jitter_us=%lu adjust_us=%ld updates=%u",
+                (unsigned long)msg->sequence, (unsigned long)rtt, (long)msg->phase_error_us,
+                pace_clock.count, pace_clock.good, (unsigned long)pace_clock.min_rtt_us,
+                (unsigned long)pace_clock.jitter_us, (long)phase_adjust_us, pace_clock.updates);
+            if (pace_clock.good >= 3 && !pace_clock.reliable)
+                twt_resync("uncertainty exceeds fixed window guard");
+            continue;
+        }
+        if (msg->sequence) continue;
+        if (msg->kind == EDGEZ_PAWR_TWT_OFFER && !twt_active && !msg->round_trip_us) {
+            if (twt_pending && (memcmp(twt_peer, event.peer, 6) ||
+                msg->reference_tsf < schedule.reference_tsf)) continue;
+            /* Duplicate OFFER must not move the timing anchor. */
+            if (!twt_pending || !edgez_pawr_twt_same_schedule(&schedule, msg)) {
+                schedule = *msg;
+                offer_received_us = event.received_us;
+                memcpy(twt_peer, event.peer, 6);
+                twt_pending = true;
+            }
+            struct edgez_pawr_twt reply = schedule;
+            reply.kind = EDGEZ_PAWR_TWT_ACCEPT;
+            bool sent = send_twt(&reply, twt_peer);
+            ESP_LOGI(TAG, "PAWR_TWT ACCEPT session=%lu target=%llu queued=%u",
+                (unsigned long)msg->session, (unsigned long long)msg->target_tsf, sent);
+        } else if (twt_pending && !memcmp(twt_peer, event.peer, 6) &&
+                   edgez_pawr_twt_same_schedule(&schedule, msg)) {
+            if (msg->kind == EDGEZ_PAWR_TWT_COMMIT) {
+                uint64_t start;
+                if (!edgez_pawr_twt_sender_start(msg, offer_received_us, &start) ||
+                    (!twt_active && start <= (uint64_t)esp_timer_get_time() + 100000) ||
+                    (twt_active && schedule.round_trip_us != msg->round_trip_us)) continue;
+                if (!twt_active) {
+                    schedule = *msg;
+                    window_start_us = start;
+                    expires_us = start + (uint64_t)schedule.lease_ms * 1000;
+                    test_sequence = 0;
+                    twt_auto = true;
+                    twt_outside = false;
+                    phase_adjust_us = 0;
+                    memset(&pace_clock, 0, sizeof(pace_clock));
+                    pending_probe_us = 0;
+                    missing_feedback = 0;
+                    twt_active = true;
+                    ESP_LOGI(TAG, "PAWR_TWT ACTIVE session=%lu start_host_us=%llu rtt_us=%lu lease_ms=%lu",
+                        (unsigned long)schedule.session, (unsigned long long)start,
+                        (unsigned long)schedule.round_trip_us, (unsigned long)schedule.lease_ms);
+                }
+                struct edgez_pawr_twt reply = schedule;
+                reply.kind = EDGEZ_PAWR_TWT_READY;
+                (void)send_twt(&reply, twt_peer);
+            } else if (msg->kind == EDGEZ_PAWR_TWT_CANCEL) {
+                twt_active = twt_pending = twt_auto = false;
+                twt_session = esp_random() | 1U;
+                ESP_LOGI(TAG, "PAWR_TWT cancelled by receiver");
+            }
+        }
+    }
+}
+
+static void twt_resync(const char *reason)
+{
+    struct edgez_pawr_twt cancel = schedule;
+    cancel.kind = EDGEZ_PAWR_TWT_CANCEL;
+    (void)send_twt(&cancel, twt_peer);
+    twt_active = twt_pending = twt_auto = false;
+    pending_probe_us = 0;
+    twt_session = esp_random() | 1U;
+    ESP_LOGW(TAG, "PAWR_TWT resync required: %s; window remains 50176 us", reason);
 }
 
 static void tx_status(void *ctx, const struct edgez_umac_tx_status *status)
@@ -104,7 +257,7 @@ static esp_err_t start_radio(void)
     }
 
     ESP_LOGI(TAG,
-             "ready: USER button broadcasts wake actions on %s %lu kHz/%u MHz",
+             "ready: USER button or serial 'w' broadcasts wake actions on %s %lu kHz/%u MHz",
              WAKE_TEST_COUNTRY, (unsigned long)WAKE_TEST_FREQUENCY_KHZ,
              WAKE_TEST_BANDWIDTH_MHZ);
     return ESP_OK;
@@ -161,35 +314,94 @@ static void IRAM_ATTR button_isr(void *arg)
 static void wake_sender_task(void *arg)
 {
     (void)arg;
-    const gpio_num_t button =
-        (gpio_num_t)CONFIG_OFFGRID_HT_HC33_HALOW_WAKE_TEST_BUTTON_GPIO;
-
+    const gpio_num_t button = (gpio_num_t)CONFIG_OFFGRID_HT_HC33_HALOW_WAKE_TEST_BUTTON_GPIO;
+    uint64_t hello_at = 0, manual_at = 0;
+    uint32_t manual_sequence = 0;
     for (;;) {
-        xSemaphoreTake(button_sem, portMAX_DELAY);
-        vTaskDelay(pdMS_TO_TICKS(WAKE_TEST_BUTTON_DEBOUNCE_MS));
-        if (gpio_get_level(button) != 0) {
+        twt_receive_pending();
+        uint64_t now = esp_timer_get_time();
+        if (twt_pending && !twt_active && now - offer_received_us > 5000000) {
+            twt_pending = false;
+        }
+        if (twt_active && now >= expires_us) {
+            ESP_LOGI(TAG, "PAWR_TWT lease expired");
+            twt_active = twt_pending = twt_auto = false;
+            twt_session = esp_random() | 1U;
+            manual_at = 0;
+        }
+        if (!twt_active && now >= hello_at) {
+            struct edgez_pawr_twt hello = { .kind = EDGEZ_PAWR_TWT_HELLO, .session = twt_session };
+            (void)send_twt(&hello, broadcast_mac);
+            hello_at = now + 1000000;
+        }
+        uint8_t command = 0;
+        (void)uart_read_bytes(UART_NUM_0, &command, 1, pdMS_TO_TICKS(2));
+        bool button_trigger = xSemaphoreTake(button_sem, 0) == pdTRUE;
+        if (button_trigger) {
+            vTaskDelay(pdMS_TO_TICKS(WAKE_TEST_BUTTON_DEBOUNCE_MS));
+            button_trigger = gpio_get_level(button) == 0;
+        }
+        now = esp_timer_get_time();
+        if (command == 't') { twt_auto = twt_outside = true; ESP_LOGI(TAG, "PAWR_TWT sparse inside/outside test armed"); }
+        if (command == 'q') twt_auto = false;
+        if (command == 'x' && twt_active) {
+            twt_resync("test stopped via serial");
             continue;
         }
-        const TickType_t burst_started = xTaskGetTickCount();
-        unsigned int queued = 0U;
-        unsigned int failed = 0U;
-
-        do {
-            const esp_err_t err = send_wake_action();
-
-            if (err == ESP_OK) {
-                queued++;
-            } else {
-                failed++;
+        if (twt_active) {
+            if (pending_probe_us && now - pending_probe_us > 100000) {
+                pending_probe_us = 0;
+                if (++missing_feedback >= 4) {
+                    twt_resync("four missing calibration responses");
+                    continue;
+                }
             }
-            vTaskDelay(pdMS_TO_TICKS(WAKE_TEST_BURST_INTERVAL_MS));
-        } while ((xTaskGetTickCount() - burst_started) <
-                 pdMS_TO_TICKS(WAKE_TEST_BURST_DURATION_MS));
-        ESP_LOGI(TAG, "USER button wake burst complete queued=%u failed=%u",
-                 queued, failed);
-        while (gpio_get_level(button) == 0) {
-            vTaskDelay(pdMS_TO_TICKS(10));
+            if (button_trigger || command == 'w' || command == 'o') {
+                uint64_t first = (uint64_t)((int64_t)window_start_us +
+                    schedule.duration_us / 2 + phase_adjust_us);
+                bool outside = command == 'o';
+                if (outside) first += schedule.interval_us / 2;
+                uint64_t slot = now + 2000 <= first ? 0 :
+                    (now + 2000 - first + schedule.interval_us - 1) / schedule.interval_us;
+                manual_at = first + slot * schedule.interval_us;
+                manual_sequence = 0x80000000U | ((uint32_t)(slot % 15) * 2) | (outside ? 1U : 0U);
+                ESP_LOGI(TAG, "PAWR_TWT USER/serial queued planned=%s host_us=%llu",
+                    outside ? "outside" : "inside", (unsigned long long)manual_at);
+            }
+            uint64_t due = (uint64_t)((int64_t)window_start_us + phase_adjust_us) + schedule.duration_us / 2 +
+                           (test_sequence / 2) * (uint64_t)schedule.interval_us +
+                           (test_sequence & 1U) * (schedule.interval_us / 2);
+            bool manual_due = manual_at && now >= manual_at;
+            if (manual_due || (twt_auto && now >= due)) {
+                uint64_t deadline = manual_due ? manual_at : due;
+                struct edgez_pawr_twt probe = schedule;
+                probe.kind = EDGEZ_PAWR_TWT_PROBE;
+                probe.sequence = manual_due ? manual_sequence : test_sequence % 30;
+                /* Never catch up by bursting after a stalled task. */
+                probe.echo_host_us = esp_timer_get_time();
+                bool sent = now - deadline <= 5000 && send_twt(&probe, twt_peer);
+                if (sent) {
+                    pending_probe_us = probe.echo_host_us;
+                    pending_probe_sequence = probe.sequence;
+                    pending_probe_adjust = phase_adjust_us;
+                }
+                ESP_LOGI(TAG, "PAWR_TWT TX sequence=%lu planned=%s late_us=%llu queued=%u",
+                    (unsigned long)probe.sequence, (probe.sequence & 1) ? "outside" : "inside",
+                    (unsigned long long)(now - deadline), sent);
+                if (manual_due) manual_at = 0; else test_sequence += twt_outside ? 1 : 2;
+            } else if (!twt_auto && now > due) {
+                ++test_sequence;
+            }
+            continue;
         }
+        manual_at = 0;
+        if (!button_trigger && command != 'w') continue;
+        ESP_LOGI(TAG, "no negotiated schedule; legacy discovery wake burst");
+        const TickType_t started = xTaskGetTickCount();
+        do {
+            (void)send_wake_action();
+            vTaskDelay(pdMS_TO_TICKS(WAKE_TEST_BURST_INTERVAL_MS));
+        } while (xTaskGetTickCount() - started < pdMS_TO_TICKS(WAKE_TEST_BURST_DURATION_MS));
     }
 }
 
@@ -206,7 +418,11 @@ void app_main(void)
     };
 
     ESP_ERROR_CHECK(edgez_rf_platform_init() == 0 ? ESP_OK : ESP_FAIL);
+    twt_session = esp_random() | 1U;
+    twt_queue = xQueueCreate(8, sizeof(struct twt_rx_event));
+    if (!twt_queue) abort();
     ESP_ERROR_CHECK(start_radio());
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 256, 0, 0, NULL, 0));
     button_sem = xSemaphoreCreateBinary();
     if (button_sem == NULL) {
         ESP_LOGE(TAG, "could not allocate button semaphore");

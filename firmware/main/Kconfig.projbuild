@@ -16,6 +16,16 @@ menu "HaLow initialization"
         range 0 21
         default 0
 
+    config OFFGRID_HT_HC33_HALOW_WAKE_TEST_DESTINATION_MAC
+        string "MM8108 wake-action destination MAC"
+        depends on OFFGRID_HT_HC33_HALOW_WAKE_TEST
+        default "ff:ff:ff:ff:ff:ff"
+        help
+            Destination address for the Morse native vendor-specific wake
+            action. Use the sleeping MM8108 station MAC for the native
+            associated-STA contract. Broadcast is useful for initial frame
+            parsing tests while the station MAC is not yet known.
+
     config OFFGRID_HT_HC33_SENSOR
         bool "Build the HT-HC33 connectionless sensor image"
         depends on IDF_TARGET_ESP32S3

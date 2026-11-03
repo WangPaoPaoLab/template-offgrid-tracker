@@ -73,6 +73,17 @@ if not is_complete_morse_module(mm_root):
 
 pio_env = env.get("PIOENV", "")
 edgez_source_option = os.environ.get("EDGEZ_HALOW_MESH_SOURCE_ROOT", "").strip()
+if not edgez_source_option:
+    # A normal developer workspace keeps the template and edgez-halow-mesh as
+    # sibling repositories. Prefer that checkout automatically so firmware
+    # changes exercise the current mesh sources; release/standalone checkouts
+    # continue to fall back to the packaged archive.
+    sibling_edgez_source = PROJECT_DIR.parent.parent / "edgez-halow-mesh"
+    if (
+        (sibling_edgez_source / "ports" / "zephyr" / "component.cmake").is_file()
+        and (sibling_edgez_source / "include" / "edgez_diagnostics.h").is_file()
+    ):
+        edgez_source_option = str(sibling_edgez_source)
 edgez_source_root = None
 if edgez_source_option:
     edgez_source_root = Path(edgez_source_option).expanduser().resolve()

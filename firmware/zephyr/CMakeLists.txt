@@ -23,6 +23,10 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
 project(offgrid-tracker-nrf54)
 
+if(CONFIG_OFFGRID_NRF54_SENSOR_PS_PROBE)
+	zephyr_include_directories("${MORSE_ZEPHYR_MODULE}/submodules/mm-iot-sdk/framework/morselib/src")
+endif()
+
 zephyr_include_directories("${CMAKE_CURRENT_LIST_DIR}")
 zephyr_include_directories(
 	"${CMAKE_CURRENT_LIST_DIR}/../nrf54"
