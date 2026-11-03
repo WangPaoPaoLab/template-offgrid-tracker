@@ -28,8 +28,8 @@ role. With a stored sensor profile, the sensor firmware:
 
 The video shows the mobile sensor view and the supply-current waveform during a
 reporting cycle. Treat it as a qualitative demonstration, not a calibrated
-battery-life result. Disconnect the J-Link probe and other debug interfaces for
-power measurements, and record the supply voltage, reporting interval, RF
+battery-life result. Disconnect the CMSIS-DAP probe and other debug interfaces
+for power measurements, and record the supply voltage, reporting interval, RF
 conditions, payload size, and acknowledgement behavior with any published
 current figure.
 

@@ -165,7 +165,7 @@ Supported development environments are:
 | `seeed-xiao-nrf54l15-hc01` | XIAO nRF54L15 + HT-HC01 | MM6108 over SPI | J-Link |
 | `seeed-xiao-nrf54l15-sense` | XIAO nRF54L15 Sense + FGH100M | MM6108 over SPI | pyOCD |
 | `edgez-nrf54l15-fgh200m-companion` | FGH200M BLE companion and full mesh node | MM8108 over SPI | J-Link |
-| `edgez-nrf54l15-fgh200m-sensor` | FGH200M low-power connectionless sensor; no BLE | MM8108 over SPI | J-Link |
+| `edgez-nrf54l15-fgh200m-sensor` | FGH200M low-power connectionless sensor; no BLE | MM8108 over SPI | OpenOCD/CMSIS-DAP |
 
 Release-style builds use the `edgez-halow-mesh` public headers and protected
 prebuilt libraries already pinned inside the platform submodules. To diagnose
@@ -218,26 +218,25 @@ cd firmware
 pio run -e edgez-nrf54l15-fgh200m-sensor
 ```
 
-For reliable flashing, program the generated HEX directly with J-Link. Replace
-the serial number with the connected probe:
-
-```sh
-JLinkExe -device NRF54L15_M33 -if SWD -speed 4000 -SelectEmuBySN <JLINK_SN>
-```
-
-At the J-Link prompt, reset, load
-`.pio/build/edgez-nrf54l15-fgh200m-sensor/firmware.hex`, reset again, and run
-the image. `O.K.` or `Contents already match` confirms flash verification.
-The reusable Commander files can run the same sequence directly:
+Flash the generated HEX through the CMSIS-DAP probe with OpenOCD:
 
 ```sh
 cd firmware
-JLinkExe -device NRF54L15_M33 -if SWD -speed 4000 \
-  -SelectEmuBySN <JLINK_SN> \
-  -CommanderScript scripts/jlink/flash_fgh200m_sensor.jlink
+pio run -e edgez-nrf54l15-fgh200m-sensor -t upload
 ```
 
-Use `scripts/jlink/flash_fgh200m_companion.jlink` for the companion image.
+The sensor, sensor-debug, and sensor-bulk-test environments use OpenOCD over
+CMSIS-DAP for both upload and debugging. PlatformIO programs
+`.pio/build/edgez-nrf54l15-fgh200m-sensor/firmware.hex`, resets the target, and
+starts the image. To select one probe when several are connected, pass its
+CMSIS-DAP serial as the upload port:
+
+```sh
+pio run -e edgez-nrf54l15-fgh200m-sensor -t upload \
+  --upload-port <CMSIS_DAP_SERIAL>
+```
+
+The companion and factory-partition provisioning flows continue to use J-Link.
 
 ### nRF54 factory identity
 

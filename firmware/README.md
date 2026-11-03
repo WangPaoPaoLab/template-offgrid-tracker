@@ -229,10 +229,18 @@ sleeps. Preserve the generated private key and never commit `.factory/`.
 The discovery regulatory domain and initial channel also come exclusively from
 this factory record. Omit mesh ID/passphrase to exercise discovery; supplying a
 complete mesh profile skips discovery.
-Reusable J-Link Commander files live under `scripts/jlink/`. Run
-`flash_fgh200m_sensor.jlink` or `flash_fgh200m_companion.jlink` from this
-`firmware/` directory. The factory script expands
-`factory_partition.jlink.in` with the generated image path before programming.
+The sensor, sensor-debug, and sensor-bulk-test PlatformIO environments upload
+and debug through OpenOCD with a CMSIS-DAP probe. Build and flash the production
+sensor image with:
+
+```sh
+pio run -e edgez-nrf54l15-fgh200m-sensor -t upload
+```
+
+Pass `--upload-port <CMSIS_DAP_SERIAL>` when more than one CMSIS-DAP probe is
+connected. The companion and factory-partition provisioning flows continue to
+use J-Link; their Commander files live under `scripts/jlink/`, and the factory
+script expands `factory_partition.jlink.in` before programming.
 
 See the [narrated low-power sensor demonstration](../docs/halow-pawr-low-power-sensor.md)
 for the mobile sensor view and measured wake/transmit waveform.
