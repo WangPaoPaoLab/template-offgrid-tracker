@@ -18,6 +18,9 @@ LOG_MODULE_REGISTER(edgez_factory, LOG_LEVEL_INF);
 
 #define EDGEZ_FACTORY_MAGIC UINT32_C(0x455a4631)
 #define EDGEZ_FACTORY_VERSION 2U
+#define EDGEZ_FACTORY_SENSOR_COUNTRY "US"
+#define EDGEZ_FACTORY_SENSOR_MESH_ID "edgez-wake-test"
+#define EDGEZ_FACTORY_SENSOR_CHANNEL 25U
 
 struct __packed edgez_factory_record {
 	uint32_t magic;
@@ -101,11 +104,15 @@ int edgez_factory_data_init(void)
 	       sizeof(cached_identity.public_key));
 	memcpy(cached_identity.private_key, record.private_key,
 	       sizeof(cached_identity.private_key));
-	strcpy(cached_identity.country, record.country);
-	strcpy(cached_identity.mesh_id, record.mesh_id);
-	cached_identity.channel = record.channel;
-	strcpy(cached_identity.passphrase, record.passphrase);
-	cached_identity.has_halow_profile = record.mesh_id[0] != '\0';
+	/* Keep the immutable per-device identity and keys from flash, but use the
+	 * fixed factory mesh bootstrap requested for this sensor build. Channel 25
+	 * is the US 914.5 MHz / 1 MHz discovery channel accepted by the unchanged
+	 * production sensor bootstrap path. */
+	strcpy(cached_identity.country, EDGEZ_FACTORY_SENSOR_COUNTRY);
+	strcpy(cached_identity.mesh_id, EDGEZ_FACTORY_SENSOR_MESH_ID);
+	cached_identity.channel = EDGEZ_FACTORY_SENSOR_CHANNEL;
+	cached_identity.passphrase[0] = '\0';
+	cached_identity.has_halow_profile = true;
 	identity_ready = true;
 	memset(&record, 0, sizeof(record));
 	return 0;

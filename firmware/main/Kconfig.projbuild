@@ -1,5 +1,21 @@
 menu "HaLow initialization"
 
+    config OFFGRID_HT_HC33_HALOW_WAKE_TEST
+        bool "Build the HT-HC33 button-to-HaLow-wake test sender"
+        depends on IDF_TARGET_ESP32S3
+        default n
+        help
+            Start a connectionless radio on hardcoded US channel 25
+            (914.5 MHz / 1 MHz)
+            test profile. Each active-low USER button press broadcasts one
+            EdgeZ wake action for the nRF54L15 interrupt-wake test image.
+
+    config OFFGRID_HT_HC33_HALOW_WAKE_TEST_BUTTON_GPIO
+        int "HT-HC33 wake-test USER button GPIO"
+        depends on OFFGRID_HT_HC33_HALOW_WAKE_TEST
+        range 0 21
+        default 0
+
     config OFFGRID_HT_HC33_SENSOR
         bool "Build the HT-HC33 connectionless sensor image"
         depends on IDF_TARGET_ESP32S3

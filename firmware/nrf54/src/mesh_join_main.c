@@ -19,6 +19,7 @@
 #include <zephyr/random/random.h>
 #include <zephyr/settings/settings.h>
 #include <zephyr/storage/flash_map.h>
+#include <zephyr/sys/atomic.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/reboot.h>
 #include <helpers/nrfx_ram_ctrl.h>
@@ -98,9 +99,11 @@ LOG_MODULE_REGISTER(edgez_mesh_join, LOG_LEVEL_INF);
 #define EDGEZ_SENSOR_SETTINGS_MAGIC UINT32_C(0x455a5353)
 #define EDGEZ_SENSOR_BULK_ACK_ATTEMPTS 4U
 #define EDGEZ_SENSOR_GPS_TIMEOUT_MS 10000U
+#define EDGEZ_SENSOR_REMOTE_WAKE_WINDOW_MS 5000U
 #define EDGEZ_BUTTON_DEBOUNCE_MS 50U
 #define EDGEZ_BUTTON_RESET_HOLD_MS 5000U
 #define EDGEZ_USER_NODE DT_PATH(zephyr_user)
+#define EDGEZ_SENSOR_LED_NODE DT_ALIAS(led0)
 
 #if defined(CONFIG_OFFGRID_NRF54_MESH_PS_TEST)
 #define EDGEZ_PS_BASELINE_MS 30000U
@@ -139,6 +142,11 @@ static uint32_t sensor_pawr_expected_hash;
 static bool sensor_pawr_waiting;
 static bool sensor_pawr_downlink_pending;
 static uint32_t sensor_downlink_ack_id;
+static const uint8_t sensor_remote_wake_payload[] = {
+	'E', 'Z', 'W', 'A', 'K', 'E', '0', '1'
+};
+static atomic_t sensor_remote_wake_pending;
+static uint32_t sensor_remote_wake_deadline_ms;
 struct sensor_settings_record {
 	uint32_t magic;
 	uint16_t version;
@@ -171,13 +179,33 @@ static char sensor_bootstrap_country[3];
 static char sensor_bootstrap_mesh_id[EDGEZ_FACTORY_MESH_ID_SIZE];
 static char sensor_bootstrap_passphrase[EDGEZ_FACTORY_PASSPHRASE_SIZE];
 static uint8_t sensor_bootstrap_channel;
+static bool sensor_factory_wake_mode;
 K_SEM_DEFINE(sensor_pawr_response_sem, 0, 1);
+K_SEM_DEFINE(sensor_remote_wake_sem, 0, 1);
 #if DT_NODE_HAS_PROP(EDGEZ_USER_NODE, key_gpios)
 static const struct gpio_dt_spec user_button =
 	GPIO_DT_SPEC_GET(EDGEZ_USER_NODE, key_gpios);
 static bool user_button_ready;
 static struct gpio_callback user_button_callback;
 K_SEM_DEFINE(user_button_sem, 0, 1);
+#endif
+#if DT_NODE_HAS_STATUS(EDGEZ_SENSOR_LED_NODE, okay)
+static const struct gpio_dt_spec sensor_led =
+	GPIO_DT_SPEC_GET(EDGEZ_SENSOR_LED_NODE, gpios);
+static bool sensor_led_ready;
+
+static void sensor_led_set_awake(bool awake)
+{
+	if (!sensor_led_ready) {
+		return;
+	}
+	if (awake) {
+		(void)gpio_pin_configure_dt(&sensor_led, GPIO_OUTPUT_ACTIVE);
+		return;
+	}
+	(void)gpio_pin_set_dt(&sensor_led, 0);
+	(void)gpio_pin_configure_dt(&sensor_led, GPIO_DISCONNECTED);
+}
 #endif
 K_MUTEX_DEFINE(batman_state_lock);
 K_MUTEX_DEFINE(batman_tx_lock);
@@ -701,9 +729,28 @@ static void poll_user_button(void)
 
 static void sensor_sleep_until_button_or_timeout(int32_t remaining_ms)
 {
+struct k_poll_event events[] = {
 #if DT_NODE_HAS_PROP(EDGEZ_USER_NODE, key_gpios)
-	if (user_button_ready && remaining_ms > 0 &&
-	    k_sem_take(&user_button_sem, K_MSEC(remaining_ms)) == 0) {
+	K_POLL_EVENT_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
+		K_POLL_MODE_NOTIFY_ONLY, &user_button_sem),
+#endif
+	K_POLL_EVENT_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
+		K_POLL_MODE_NOTIFY_ONLY, &sensor_remote_wake_sem),
+	};
+
+	if (remaining_ms <= 0 ||
+	    k_poll(events, ARRAY_SIZE(events), K_MSEC(remaining_ms)) != 0) {
+		return;
+	}
+	const size_t remote_index = ARRAY_SIZE(events) - 1U;
+	if (events[remote_index].state == K_POLL_STATE_SEM_AVAILABLE) {
+		(void)k_sem_take(&sensor_remote_wake_sem, K_NO_WAIT);
+		return;
+	}
+#if DT_NODE_HAS_PROP(EDGEZ_USER_NODE, key_gpios)
+	if (user_button_ready &&
+	    events[0].state == K_POLL_STATE_SEM_AVAILABLE &&
+	    k_sem_take(&user_button_sem, K_NO_WAIT) == 0) {
 		/* The first press wakes the MCU. Keep polling only while it is held so
 		 * the five-second reset duration starts after this wake, matching the
 		 * ESP32 sensor behavior without periodic wakeups during normal sleep. */
@@ -715,7 +762,6 @@ static void sensor_sleep_until_button_or_timeout(int32_t remaining_ms)
 		return;
 	}
 #endif
-	k_msleep(remaining_ms > 0 ? remaining_ms : 1);
 }
 
 static int deliver_msdu(const uint8_t destination[6], const uint8_t source[6],
@@ -799,6 +845,15 @@ static int join_ignore_unsupported(void *ctx,
 			return EDGEZ_UMAC_OK;
 		}
 		if (request.type == EDGEZ_PAWR_REQUEST_MESH_PACKET) {
+			if (IS_ENABLED(CONFIG_OFFGRID_NRF54_ROLE_SENSOR) &&
+			    request.payload_length ==
+				    sizeof(sensor_remote_wake_payload) &&
+			    memcmp(request.payload, sensor_remote_wake_payload,
+				   sizeof(sensor_remote_wake_payload)) == 0) {
+				atomic_set(&sensor_remote_wake_pending, 1);
+				k_sem_give(&sensor_remote_wake_sem);
+				return EDGEZ_UMAC_OK;
+			}
 			if (IS_ENABLED(CONFIG_OFFGRID_NRF54_ROLE_SENSOR) &&
 			    request.payload_length <=
 				    EDGEZ_SENSOR_PENDING_PACKET_MAX) {
@@ -1135,6 +1190,8 @@ static int sensor_load_factory_bootstrap(void)
 		sensor_bootstrap_passphrase[0] = '\0';
 	}
 	sensor_bootstrap_channel = factory.channel;
+	sensor_factory_wake_mode = factory.has_halow_profile &&
+		strcmp(factory.mesh_id, "edgez-wake-test") == 0;
 	LOG_INF("factory discovery profile country=%s mesh_id=%s channel=%u frequency=%u kHz bandwidth=%u MHz",
 		sensor_bootstrap_country, sensor_bootstrap_mesh_id,
 		sensor_bootstrap_channel,
@@ -2413,6 +2470,14 @@ static struct {
 
 static void sensor_begin_cycle(uint32_t now)
 {
+#if DT_NODE_HAS_STATUS(EDGEZ_SENSOR_LED_NODE, okay)
+	/* In the fixed HC33 wake experiment the LED belongs exclusively to the
+	 * remote-wake indication. This prevents the ordinary sensor report timer
+	 * from looking like a successful HC33 wake. */
+	if (!sensor_factory_wake_mode) {
+		sensor_led_set_awake(true);
+	}
+#endif
 	sensor_power.cycle_started_ms = now;
 	sensor_power.phase = SENSOR_POWER_READY;
 }
@@ -2480,6 +2545,9 @@ static void sensor_enter(const struct edgez_halow_profile *profile, uint32_t now
 
 static void sensor_leave(void)
 {
+#if DT_NODE_HAS_STATUS(EDGEZ_SENSOR_LED_NODE, okay)
+	sensor_led_set_awake(false);
+#endif
 	edgez_gps_stop();
 	sensor_power.phase = SENSOR_POWER_INACTIVE;
 	sensor_power.generation = 0U;
@@ -2514,6 +2582,9 @@ static void sensor_finish_cycle(uint32_t now)
 			sensor_power.cycle_started_ms + interval_ms : now + 1000U;
 	}
 	sensor_power.phase = SENSOR_POWER_SLEEPING;
+#if DT_NODE_HAS_STATUS(EDGEZ_SENSOR_LED_NODE, okay)
+	sensor_led_set_awake(false);
+#endif
 	LOG_INF("sensor cycle complete; HaLow %s for %u ms",
 #if defined(CONFIG_OFFGRID_NRF54_SENSOR_HALOW_POWER_SAVE)
 		sensor_halow_sleep_allowed ? "chip sleep" : "off",
@@ -2731,7 +2802,8 @@ static void sensor_power_tick(const struct edgez_halow_profile *profile,
 				rc == 0 ? "acknowledged" : "unacknowledged",
 				sensor_bootstrap_channel);
 
-			if (!provisioning_cycle || edgez_config_should_autostart() ||
+			if (sensor_factory_wake_mode || !provisioning_cycle ||
+			    edgez_config_should_autostart() ||
 			    !sensor_advance_bootstrap_channel() ||
 			    sensor_bootstrap_channel == sweep_first_channel) {
 				break;
@@ -2749,11 +2821,16 @@ static void sensor_power_tick(const struct edgez_halow_profile *profile,
 		/* Zero-touch discovery tears down after the complete channel sweep.
 		 * A sensor that began the cycle provisioned stays on its assigned
 		 * channel and uses MM8108 chip sleep between reports. */
-		bool keep_radio = !provisioning_cycle &&
-			edgez_config_should_autostart();
-		bool ps_ready = keep_radio && (sensor_halow_ps_configured ||
-			sensor_configure_halow_power_save());
-		if (!ps_ready || !sensor_set_halow_wake(false)) {
+		bool keep_radio = sensor_factory_wake_mode ||
+			(!provisioning_cycle && edgez_config_should_autostart());
+		bool ps_ready = sensor_factory_wake_mode ||
+			(keep_radio && (sensor_halow_ps_configured ||
+			 sensor_configure_halow_power_save()));
+		/* Keep the receiver continuously awake in the HC33 diagnostic. Once
+		 * end-to-end RX is proven this can be replaced by duty-cycled windows. */
+		const bool keep_awake_for_verify = sensor_factory_wake_mode;
+		if (!ps_ready ||
+		    (!keep_awake_for_verify && !sensor_set_halow_wake(false))) {
 			LOG_WRN("sensor HaLow power save failed; cutting rail");
 			int stop_rc = stop_mesh_profile(true);
 
@@ -2796,6 +2873,12 @@ int main(void)
 	LOG_INF("EdgeZ nRF54 role=%s; IP services disabled",
 		sensor_role ? "low-power HaLow sensor" : "BLE companion + BATMAN");
 	configure_user_button();
+#if DT_NODE_HAS_STATUS(EDGEZ_SENSOR_LED_NODE, okay)
+	if (sensor_role && gpio_is_ready_dt(&sensor_led)) {
+		sensor_led_ready = true;
+		sensor_led_set_awake(false);
+	}
+#endif
 	int factory_rc = edgez_factory_data_init();
 	if (factory_rc != 0) {
 		LOG_ERR("factory identity unavailable rc=%d", factory_rc);
@@ -2838,9 +2921,10 @@ int main(void)
 		poll_user_button();
 
 		if (sensor_role) {
-			if (!edgez_config_should_autostart()) {
+			if (sensor_factory_wake_mode ||
+			    !edgez_config_should_autostart()) {
 				if (sensor_bootstrap_profile(&profile) != 0) {
-					LOG_ERR("invalid zero-touch bootstrap country=%s channel=%d",
+					LOG_ERR("invalid factory bootstrap country=%s channel=%d",
 						sensor_bootstrap_country,
 						sensor_bootstrap_channel);
 					sensor_force_cpu_low_power();
@@ -2851,6 +2935,31 @@ int main(void)
 			sensor_power_tick(&profile, now);
 			edgez_ble_process();
 			if (sensor_power.phase == SENSOR_POWER_SLEEPING) {
+				if (atomic_cas(&sensor_remote_wake_pending, 1, 0)) {
+					sensor_remote_wake_deadline_ms =
+						now + EDGEZ_SENSOR_REMOTE_WAKE_WINDOW_MS;
+#if DT_NODE_HAS_STATUS(EDGEZ_SENSOR_LED_NODE, okay)
+					sensor_led_set_awake(true);
+#endif
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_HALOW_POWER_SAVE)
+					if (mesh_started && sensor_halow_sleep_allowed) {
+						(void)sensor_set_halow_wake(true);
+					}
+#endif
+				}
+				if (sensor_remote_wake_deadline_ms != 0U &&
+				    (int32_t)(now - sensor_remote_wake_deadline_ms) >= 0) {
+					sensor_remote_wake_deadline_ms = 0U;
+#if DT_NODE_HAS_STATUS(EDGEZ_SENSOR_LED_NODE, okay)
+					sensor_led_set_awake(false);
+#endif
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_HALOW_POWER_SAVE)
+					if (!sensor_factory_wake_mode && mesh_started &&
+					    !sensor_halow_sleep_allowed) {
+						(void)sensor_set_halow_wake(false);
+					}
+#endif
+				}
 				if (!edgez_ble_is_stopped()) {
 					/* Complete an asynchronous disconnect and controller
 					 * shutdown before entering the long timer sleep. */
@@ -2858,9 +2967,14 @@ int main(void)
 					continue;
 				}
 				const uint32_t sleep_now = k_uptime_get_32();
-				const int32_t remaining_ms =
+				int32_t remaining_ms =
 					(int32_t)(sensor_power.next_wake_ms - sleep_now);
+				if (sensor_remote_wake_deadline_ms != 0U) {
+					const int32_t wake_remaining_ms = (int32_t)(
+						sensor_remote_wake_deadline_ms - sleep_now);
 
+					remaining_ms = MIN(remaining_ms, wake_remaining_ms);
+				}
 				/* Zephyr's tickless idle puts the nRF54L15 to sleep until
 				 * the next PAwR cycle or a hardware interrupt (including
 				 * the IMU FIFO watermark interrupt). */

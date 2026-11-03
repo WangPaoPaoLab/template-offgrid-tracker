@@ -24,7 +24,11 @@ if(CONFIG_DAB_RAW_RF_TEST)
         endif()
     endif()
 else()
-    if(CONFIG_OFFGRID_HT_HC33_SENSOR)
+    if(CONFIG_OFFGRID_HT_HC33_HALOW_WAKE_TEST)
+        set(component_sources
+            "ht_hc33_halow_wake_test.c"
+        )
+    elseif(CONFIG_OFFGRID_HT_HC33_SENSOR)
         set(component_sources
             "ht_hc33_sensor_main.c"
             "edgez_esp_factory_data.c"
