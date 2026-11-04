@@ -152,6 +152,7 @@ cd firmware
 pio run -e heltec-hc33
 pio run -e edgez-nrf54l15-fgh200m-companion
 pio run -e edgez-nrf54l15-fgh200m-sensor
+pio run -e edgez-nrf54l15-vc0706-camera-test
 ```
 
 Supported development environments are:
@@ -166,6 +167,7 @@ Supported development environments are:
 | `seeed-xiao-nrf54l15-sense` | XIAO nRF54L15 Sense + FGH100M | MM6108 over SPI | pyOCD |
 | `edgez-nrf54l15-fgh200m-companion` | FGH200M BLE companion and full mesh node | MM8108 over SPI | J-Link |
 | `edgez-nrf54l15-fgh200m-sensor` | FGH200M low-power connectionless sensor; no BLE | MM8108 over SPI | OpenOCD/CMSIS-DAP |
+| `edgez-nrf54l15-vc0706-camera-test` | nRF54L15 + VC0706-compatible TTL camera on the former L76K UART | Disabled | OpenOCD/CMSIS-DAP |
 
 Release-style builds use the `edgez-halow-mesh` public headers and protected
 prebuilt libraries already pinned inside the platform submodules. To diagnose

@@ -82,6 +82,14 @@ config OFFGRID_NRF54_SENSOR_GPS
       Wake the L76K and wait briefly for a fix before each sensor PAwR report,
       then stop GPS and suspend its UART before returning to tickless sleep.
 
+config OFFGRID_NRF54_CAMERA_TEST
+    bool "Run the VC0706-compatible UART camera capture test"
+    default n
+    help
+      Build a standalone nRF54L15 diagnostic that replaces the L76K on its
+      UART, captures one 320x240 JPEG, and writes the complete image to the
+      RTT console as hexadecimal text.
+
 config OFFGRID_NRF54_SENSOR_HALOW_POWER_SAVE
     bool "Keep HaLow initialized in chip sleep between sensor reports"
     depends on OFFGRID_NRF54_IMU_TIMER_DRAIN

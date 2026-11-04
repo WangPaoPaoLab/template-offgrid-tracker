@@ -118,9 +118,36 @@ pio run -e heltec-hc33
 pio run -e heltec-hc33-mesh-ps
 pio run -e edgez-nrf54l15-fgh200m-companion
 pio run -e edgez-nrf54l15-fgh200m-sensor
+pio run -e edgez-nrf54l15-vc0706-camera-test
 pio run -e seeed-xiao-nrf54l15-hc01
 pio run -e seeed-xiao-nrf54l15-sense
 ```
+
+### nRF54L15 VC0706-compatible camera test
+
+`edgez-nrf54l15-vc0706-camera-test` replaces the L76K on the FGH200M UART
+connector with a 3.3 V TTL serial camera. P1.09 enables camera power; connect
+camera RXD to P1.11 and TXD to P1.12. The UART runs at 921600 baud. The target
+waits four seconds after enabling power, selects the protocol's
+supported 320x240 mode (there is no 320x480 mode), captures one JPEG, and
+prints its complete contents between `IMAGE_HEX_BEGIN` and `IMAGE_HEX_END` on
+the SEGGER RTT console. Each text line contains 32 image bytes as 64 hex
+characters.
+
+```sh
+cd firmware
+pio run -e edgez-nrf54l15-vc0706-camera-test
+pio run -e edgez-nrf54l15-vc0706-camera-test -t upload
+```
+
+Save the RTT console output and rebuild the JPEG with:
+
+```sh
+python3 scripts/vc0706_hex_to_jpeg.py camera-rtt.log capture.jpg
+```
+
+The converter checks the declared byte count and JPEG `FFD8`/`FFD9` markers
+before writing the image.
 
 ### HT-HC33 mesh power-save experiment
 

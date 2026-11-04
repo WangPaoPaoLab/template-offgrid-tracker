@@ -13,6 +13,12 @@ PROJECT_DIR = Path(env.subst("$PROJECT_DIR")).resolve()
 env.Replace(PROJECT_SRC_DIR=str(PROJECT_DIR / "nrf54" / "src"))
 
 MORSE_CHIP = env.GetProjectOption("custom_morse_chip", "mm6108").lower()
+MORSE_ENABLED = env.GetProjectOption("custom_morse_enabled", "yes").lower() not in (
+    "0",
+    "false",
+    "no",
+    "off",
+)
 if MORSE_CHIP not in ("mm6108", "mm8108"):
     print(f"ERROR: Unsupported custom_morse_chip: {MORSE_CHIP}")
     env.Exit(1)
@@ -205,10 +211,16 @@ for src, dst, label in staged_files:
         shutil.copyfile(src, dst)
         print(f"Staged {label}: {dst}")
 
-env["ENV"]["MORSE_SM_USE_APP_BINARIES"] = "1"
-os.environ["MORSE_SM_USE_APP_BINARIES"] = "1"
+if MORSE_ENABLED:
+    env["ENV"]["MORSE_SM_USE_APP_BINARIES"] = "1"
+    os.environ["MORSE_SM_USE_APP_BINARIES"] = "1"
+else:
+    env["ENV"].pop("MORSE_SM_USE_APP_BINARIES", None)
+    os.environ.pop("MORSE_SM_USE_APP_BINARIES", None)
 
 print(f"Using Morse Zephyr source module: {mm_root} ({MORSE_CHIP}, BCF {bcf_filename})")
+if not MORSE_ENABLED:
+    print("Morse firmware/archive build disabled for this environment")
 if edgez_source_root is not None:
     print(f"Using EdgeZ HaLow mesh source with diagnostics: {edgez_source_root}")
 else:

@@ -61,9 +61,15 @@ endif()
 
 # PlatformIO compiles nrf54/src recursively. nanopb lives outside that source
 # tree so ESP-IDF and Zephyr can share one runtime copy.
-target_sources(app PRIVATE
-	"${CMAKE_CURRENT_LIST_DIR}/../shared/nanopb/pb_common.c"
-	"${CMAKE_CURRENT_LIST_DIR}/../shared/nanopb/pb_decode.c"
-	"${CMAKE_CURRENT_LIST_DIR}/../shared/nanopb/pb_encode.c"
-	"${MORSE_ZEPHYR_MODULE}/submodules/edgez-rf-morsemicro/src/edgez_morse_channel.c"
-)
+if(CONFIG_OFFGRID_NRF54_CAMERA_TEST)
+	target_sources(app PRIVATE
+		"${CMAKE_CURRENT_LIST_DIR}/../nrf54/src/vc0706_camera_test.c"
+	)
+else()
+	target_sources(app PRIVATE
+		"${CMAKE_CURRENT_LIST_DIR}/../shared/nanopb/pb_common.c"
+		"${CMAKE_CURRENT_LIST_DIR}/../shared/nanopb/pb_decode.c"
+		"${CMAKE_CURRENT_LIST_DIR}/../shared/nanopb/pb_encode.c"
+		"${MORSE_ZEPHYR_MODULE}/submodules/edgez-rf-morsemicro/src/edgez_morse_channel.c"
+	)
+endif()
