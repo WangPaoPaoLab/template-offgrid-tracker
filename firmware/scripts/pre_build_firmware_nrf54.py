@@ -51,6 +51,14 @@ def patch_zephyr_440_platformio_builder():
 
     anchor = "target_configs = load_target_configurations(codemodel)\n"
     morse_build = '''\n# PlatformIO consumes CMake's code model but does not execute custom targets.\n# Build Morse's merged/mangled archive before SCons resolves its dependencies.\nif os.environ.get("MORSE_SM_USE_APP_BINARIES"):\n    ninja = os.path.join(platform.get_package_dir("tool-ninja"), "ninja")\n    subprocess.check_call([ninja, "-C", BUILD_DIR, "libmorse_build"])\n'''
+    previous_morse_build = morse_build
+    # Ninja may regenerate CMake after a module source list changes. Refresh
+    # the model before SCons chooses objects, otherwise new RF sources are
+    # silently omitted until a second build invocation.
+    morse_build += '    codemodel = get_cmake_code_model(west_manifest)\n    target_configs = load_target_configurations(codemodel)\n'
+    if previous_morse_build in contents and morse_build not in contents:
+        contents = contents.replace(previous_morse_build, morse_build)
+        changed = True
     if morse_build not in contents:
         if anchor not in contents:
             print("ERROR: Unsupported Zephyr 4.4 PlatformIO builder layout")
