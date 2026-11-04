@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdatomic.h>
 #include <string.h>
 
 #include "driver/gpio.h"
@@ -12,6 +13,10 @@
 #include "freertos/queue.h"
 #include "edgez_rf_api.h"
 #include "edgez_umac.h"
+#include "common/morse_commands.h"
+#include "common/morse_command_utils.h"
+extern enum mmwlan_status mmdrv_execute_command(uint8_t *command, uint8_t *response, uint32_t *response_len);
+extern enum mmwlan_status mmdrv_rm_if(uint16_t vif_id);
 #include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -62,11 +67,140 @@ static uint32_t last_pawr_id, last_pawr_hash;
 static uint64_t last_pawr_us;
 static uint8_t last_pawr_peer[6];
 
+/* Bounded passive PM audit. Duplicate monitor copies are filtered below. */
+struct pm_audit_event {
+    uint16_t fc, length, seq, qos;
+    uint8_t ra[6], ta[6], bssid[6], vif;
+    int16_t rssi;
+};
+static QueueHandle_t pm_audit_queue;
+static atomic_bool pm_audit_enabled;
+static atomic_uint pm_audit_monitor = ATOMIC_VAR_INIT(UINT16_MAX);
+static atomic_uint pm_audit_frames, pm_audit_nulls, pm_audit_dropped, pm_audit_fcs;
+static uint64_t pm_audit_until;
+static unsigned pm_audit_printed;
+
+static void pm_audit_receive(const struct edgez_umac_rx_frame *frame)
+{
+    if (!atomic_load(&pm_audit_enabled) || !frame || !frame->data ||
+        frame->format != EDGEZ_UMAC_RX_RAW_80211 || frame->length < 16) return;
+    atomic_fetch_add(&pm_audit_frames, 1);
+    uint16_t fc = frame->data[0] | ((uint16_t)frame->data[1] << 8);
+    unsigned type = (fc >> 2) & 3, subtype = (fc >> 4) & 15;
+    bool null = type == 2 && (subtype == 4 || subtype == 12);
+    if (null) atomic_fetch_add(&pm_audit_nulls, 1);
+    /* Include action frames to verify the observer actually sees this peer. */
+    if (!null && type != 0 && !(type == 1 && subtype == 10)) return;
+    struct pm_audit_event event = { .fc = fc, .length = frame->length,
+        .vif = frame->vif_id, .rssi = frame->rssi_dbm };
+    memcpy(event.ra, frame->data + 4, 6);
+    memcpy(event.ta, frame->data + 10, 6);
+    if (frame->length >= 24) {
+        memcpy(event.bssid, frame->data + 16, 6);
+        event.seq = frame->data[22] | ((uint16_t)frame->data[23] << 8);
+    }
+    if (null && subtype == 12 && frame->length >= 26 && (fc & 0x0300) != 0x0300)
+        event.qos = frame->data[24] | ((uint16_t)frame->data[25] << 8);
+    if (xQueueSend(pm_audit_queue, &event, 0) != pdTRUE)
+        atomic_fetch_add(&pm_audit_dropped, 1);
+}
+
+static void pm_audit_stop(void)
+{
+    atomic_store(&pm_audit_enabled, false);
+    unsigned vif = atomic_load(&pm_audit_monitor);
+    enum mmwlan_status rc = vif == UINT16_MAX ? MMWLAN_SUCCESS : mmdrv_rm_if((uint16_t)vif);
+    if (rc == MMWLAN_SUCCESS) atomic_store(&pm_audit_monitor, UINT16_MAX);
+    pm_audit_until = 0;
+    ESP_LOGI(TAG, "PM_AUDIT STOP remove_sdk=%d frames=%u nulls=%u dropped=%u fcs_stripped=%u; no RF sleep inference",
+        rc, atomic_load(&pm_audit_frames), atomic_load(&pm_audit_nulls), atomic_load(&pm_audit_dropped), atomic_load(&pm_audit_fcs));
+}
+
+static void pm_audit_start(bool monitor)
+{
+    if (atomic_load(&pm_audit_monitor) != UINT16_MAX) { pm_audit_stop(); return; }
+    uint8_t mac[6]; memcpy(mac, radio_info.mac_addr, 6); mac[0] |= 2; mac[5] ^= 0x80;
+    uint16_t vif = UINT16_MAX;
+    if (monitor) {
+    struct morse_cmd_req_add_interface cmd = MORSE_COMMAND_INIT(cmd,
+        MORSE_CMD_ID_ADD_INTERFACE, UINT16_MAX,
+        .interface_type = htole32(MORSE_CMD_INTERFACE_TYPE_MON));
+    memcpy(cmd.addr.octet, mac, 6);
+    struct morse_cmd_resp_add_interface reply = {0};
+    uint32_t bytes = sizeof(reply);
+    enum mmwlan_status rc = mmdrv_execute_command((uint8_t *)&cmd, (uint8_t *)&reply, &bytes);
+    if (rc == MMWLAN_SUCCESS && (bytes != sizeof(reply) ||
+        le16toh(reply.hdr.message_id) != MORSE_CMD_ID_ADD_INTERFACE || le32toh(reply.status) != 0))
+        rc = MMWLAN_ERROR;
+    if (rc == MMWLAN_SUCCESS) vif = le16toh(reply.hdr.vif_id);
+    if (rc != MMWLAN_SUCCESS) { ESP_LOGE(TAG, "PM_AUDIT monitor rejected sdk=%d", rc); return; }
+    const struct edgez_umac_channel channel = {
+        .operating_frequency_hz = WAKE_TEST_FREQUENCY_KHZ * 1000U,
+        .operating_bw_mhz = 1, .primary_bw_mhz = 1, .primary_1mhz_channel_index = 0,
+    };
+    int tuned = wake_umac.driver->set_channel(wake_umac.driver_ctx, &channel);
+    if (tuned != 0) {
+        ESP_LOGE(TAG, "PM_AUDIT channel reapply failed rc=%d", tuned);
+        (void)mmdrv_rm_if(vif); return;
+    }
+    }
+
+    xQueueReset(pm_audit_queue);
+    atomic_store(&pm_audit_frames, 0); atomic_store(&pm_audit_nulls, 0); atomic_store(&pm_audit_dropped, 0);
+    atomic_store(&pm_audit_fcs, 0);
+    pm_audit_printed = 0;
+    atomic_store(&pm_audit_monitor, vif);
+    pm_audit_until = esp_timer_get_time() + 30000000;
+    atomic_store(&pm_audit_enabled, true);
+    ESP_LOGI(TAG, "PM_AUDIT START monitor=%u duration_ms=30000 scan=unchanged no_probe_tx", vif);
+}
+
+static void pm_audit_poll(void)
+{
+    struct pm_audit_event e;
+    while (xQueueReceive(pm_audit_queue, &e, 0) == pdTRUE) {
+        if (pm_audit_printed++ >= 64) continue;
+        ESP_LOGI(TAG, "PM_AUDIT RX fc=%04x pm=%u retry=%u tods=%u fromds=%u len=%u vif=%u rssi=%d seq=%u qos=%04x ra=%02x:%02x:%02x:%02x:%02x:%02x ta=%02x:%02x:%02x:%02x:%02x:%02x addr3=%02x:%02x:%02x:%02x:%02x:%02x",
+            e.fc, !!(e.fc & 0x1000), !!(e.fc & 0x0800), !!(e.fc & 0x0100), !!(e.fc & 0x0200),
+            e.length, e.vif, e.rssi, e.seq >> 4, e.qos,
+            e.ra[0],e.ra[1],e.ra[2],e.ra[3],e.ra[4],e.ra[5],
+            e.ta[0],e.ta[1],e.ta[2],e.ta[3],e.ta[4],e.ta[5],
+            e.bssid[0],e.bssid[1],e.bssid[2],e.bssid[3],e.bssid[4],e.bssid[5]);
+    }
+    if (pm_audit_until && (uint64_t)esp_timer_get_time() >= pm_audit_until) pm_audit_stop();
+}
+
 static void twt_resync(const char *reason);
 
 static void receive_frame(void *ctx, const struct edgez_umac_rx_frame *frame)
 {
     (void)ctx;
+    struct edgez_umac_rx_frame normalized;
+    if (frame && frame->data && frame->length >= 20 &&
+        frame->vif_id == atomic_load(&pm_audit_monitor)) {
+        /* MON packets can retain FCS without the metadata flag. Strip only
+         * after validating the full IEEE CRC-32, never by length alone. */
+        size_t n = frame->length - 4;
+        const uint8_t *fcs = frame->data + n;
+        uint32_t received = (uint32_t)fcs[0] | ((uint32_t)fcs[1] << 8) |
+            ((uint32_t)fcs[2] << 16) | ((uint32_t)fcs[3] << 24);
+        if (edgez_pawr_compress_ssid(frame->data, n) == received) {
+            normalized = *frame; normalized.length = n; frame = &normalized;
+            atomic_fetch_add(&pm_audit_fcs, 1);
+        }
+    }
+    pm_audit_receive(frame);
+    if (frame && frame->data && atomic_load(&pm_audit_enabled)) {
+        /* Firmware may route all RX to MON, or provide a second copy. Keep
+         * PAwR operational in either case without processing copies twice. */
+        static struct { uint32_t hash; uint64_t at; } seen[8];
+        static unsigned next;
+        uint32_t hash = edgez_pawr_payload_hash(frame->data, frame->length);
+        uint64_t now = esp_timer_get_time();
+        for (unsigned i = 0; i < 8; ++i)
+            if (seen[i].at && seen[i].hash == hash && now - seen[i].at < 10000) return;
+        seen[next].hash = hash; seen[next].at = now; next = (next + 1) % 8;
+    }
     struct edgez_pawr_action_view action;
     struct edgez_pawr_request_view request;
     struct twt_rx_event event = { .received_us = esp_timer_get_time() };
@@ -353,6 +487,7 @@ static void wake_sender_task(void *arg)
     (void)arg;
     const gpio_num_t button = (gpio_num_t)CONFIG_OFFGRID_HT_HC33_HALOW_WAKE_TEST_BUTTON_GPIO;
     for (;;) {
+        pm_audit_poll();
         twt_receive_pending();
         uint64_t now = esp_timer_get_time();
         if (twt_pending && !twt_active && now - offer_received_us > 5000000) {
@@ -368,6 +503,9 @@ static void wake_sender_task(void *arg)
         }
         uint8_t command = 0;
         (void)uart_read_bytes(UART_NUM_0, &command, 1, pdMS_TO_TICKS(2));
+        if (command == 'p') pm_audit_start(true);
+        if (command == 'o') pm_audit_start(false);
+        if (command == 'P') pm_audit_stop();
         bool button_trigger = xSemaphoreTake(button_sem, 0) == pdTRUE;
         if (button_trigger) {
             vTaskDelay(pdMS_TO_TICKS(WAKE_TEST_BUTTON_DEBOUNCE_MS));
@@ -444,7 +582,8 @@ void app_main(void)
     ESP_ERROR_CHECK(edgez_rf_platform_init() == 0 ? ESP_OK : ESP_FAIL);
     twt_session = esp_random() | 1U;
     twt_queue = xQueueCreate(8, sizeof(struct twt_rx_event));
-    if (!twt_queue) abort();
+    pm_audit_queue = xQueueCreate(24, sizeof(struct pm_audit_event));
+    if (!twt_queue || !pm_audit_queue) abort();
     ESP_ERROR_CHECK(start_radio());
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 256, 0, 0, NULL, 0));
     button_sem = xSemaphoreCreateBinary();

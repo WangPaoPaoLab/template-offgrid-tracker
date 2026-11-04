@@ -148,3 +148,10 @@ if(IDF_TARGET STREQUAL "esp32p4" AND NOT CONFIG_DAB_RAW_RF_TEST)
     list(FILTER esp_hosted_sources EXCLUDE REGEX "esp_hosted_host_init\\.c$")
     set_property(TARGET ${esp_hosted_lib} PROPERTY SOURCES "${esp_hosted_sources}")
 endif()
+
+# Factory HC33 PM-frame audit uses the SDK raw command definitions only.
+if(CONFIG_OFFGRID_HT_HC33_HALOW_WAKE_TEST)
+    target_include_directories(${COMPONENT_LIB} PRIVATE
+        "${CMAKE_CURRENT_LIST_DIR}/../platforms/esp-halow/halow/components/mm-iot-sdk/framework/morselib/src"
+        "${CMAKE_CURRENT_LIST_DIR}/../platforms/esp-halow/halow/components/mm-iot-sdk/framework/morselib/include")
+endif()

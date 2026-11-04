@@ -91,6 +91,124 @@ static bool sensor_twt_wait(const struct edgez_pawr_twt *offer, uint8_t kind,
     return false;
 }
 
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_MAC_SNAPSHOT)
+#include "edgez_morse_diagnostics.h"
+/* SDK mmwlan_get_morse_stats() uses 1600 bytes. Keep the complete command
+ * response so the host decoder can validate its header and payload bounds. */
+static uint8_t sensor_twt_mac_snapshot[EDGEZ_MORSE_MAC_DIAGNOSTICS_CAPACITY] __aligned(4);
+static volatile uint32_t sensor_twt_mac_snapshot_length;
+static volatile int32_t sensor_twt_mac_snapshot_status = -1;
+
+static void sensor_twt_capture_mac(void)
+{
+    uint32_t bytes = 0;
+    int rc = edgez_morse_read_mac_diagnostics(sensor_twt_mac_snapshot,
+        sizeof(sensor_twt_mac_snapshot), &bytes);
+    sensor_twt_mac_snapshot_length = bytes;
+    sensor_twt_mac_snapshot_status = rc;
+    LOG_INF("PAWR_TWT MAC_SNAPSHOT sdk=%d bytes=%u; one-shot protocol diagnostic, not a power measurement",
+        rc, bytes);
+}
+#endif
+
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_FORCE_SNOOZE)
+static void sensor_twt_force_snooze(void)
+{
+    static bool unsupported;
+    if (unsupported) return;
+    /* Linux morse_commands.h: FORCE_POWER_MODE=0x48, SNOOZE=0.
+     * SDK ABI 57.3 has no wrapper, so treat support as a capability probe. */
+    struct __packed {
+        struct morse_cmd_header hdr;
+        uint32_t mode;
+    } cmd = MORSE_COMMAND_INIT(cmd, 0x0048, mesh_runtime.umac.vif_id,
+        .mode = htole32(0));
+    struct { struct morse_cmd_resp resp; uint8_t extra[112]; } reply = {0};
+    uint32_t bytes = sizeof(reply);
+    enum mmwlan_status rc = mmdrv_execute_command((uint8_t *)&cmd, (uint8_t *)&reply, &bytes);
+    bool valid = (rc == MMWLAN_SUCCESS || rc == MMWLAN_COMMAND_ERROR) &&
+        bytes >= sizeof(reply.resp) && bytes <= sizeof(reply) &&
+        le16toh(reply.resp.hdr.message_id) == 0x0048 &&
+        le16toh(reply.resp.hdr.vif_id) == mesh_runtime.umac.vif_id;
+    int32_t status = valid ? (int32_t)le32toh(reply.resp.status) : INT32_MIN;
+    bool accepted = valid && rc == MMWLAN_SUCCESS && status == 0;
+    LOG_INF("PAWR_TWT FORCE_SNOOZE cmd=0x0048 mode=0 sdk=%d valid=%u fw=%d accepted=%u; STA/TWT retained; RF sleep unverified",
+        rc, valid, (int)status, accepted);
+    /* Never fall through to rail-cutoff cleanup when capability is absent. */
+    unsupported = !accepted;
+}
+#endif
+
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_REMOVE_COMPARE)
+/* Diagnostic state for read-only inspection, never a claim about RF sleep:
+ * 0 = not started, 1 = installed, 2 = TWT removed, 3 = invalid,
+ * 4 = TWT and station removed. */
+static volatile uint32_t sensor_twt_compare_phase;
+
+static bool sensor_twt_compare_quiet_window(void)
+{
+    struct sensor_twt_event event;
+    int64_t until = k_uptime_get() + 90000;
+    for (;;) {
+        int64_t remaining = until - k_uptime_get();
+        if (remaining <= 0) return true;
+        if (k_msgq_get(&sensor_twt_queue, &event, K_MSEC(remaining)) == 0) {
+            LOG_ERR("TWT_COMPARE unexpected RX kind=%u; comparison invalid", event.msg.kind);
+            return false;
+        }
+    }
+}
+
+static void sensor_twt_compare_hold(void)
+{
+    struct sensor_twt_event event;
+#if !defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_STATION_REMOVE_COMPARE)
+    if (mmdrv_set_wake_enabled(false) != MMWLAN_SUCCESS) goto invalid;
+    sensor_halow_sleep_allowed = true;
+    sensor_twt_compare_phase = 1;
+    LOG_INF("TWT_COMPARE A installed duration_ms=90000 rail=on host_wake=released; external measurement only");
+    if (!sensor_twt_compare_quiet_window()) goto invalid;
+#endif
+    if (mmdrv_set_wake_enabled(true) != MMWLAN_SUCCESS) goto invalid;
+    sensor_halow_sleep_allowed = false;
+    if (!sensor_probe_twt_at(MORSE_CMD_ID_TWT_AGREEMENT_REMOVE, 0x1420, 0)) goto invalid;
+    if (mmdrv_set_wake_enabled(false) != MMWLAN_SUCCESS) goto invalid;
+    sensor_halow_sleep_allowed = true;
+    sensor_twt_compare_phase = 2;
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_STATION_REMOVE_COMPARE)
+    LOG_INF("TWT_COMPARE B TWT_removed station=authorized duration_ms=90000 rail=on host_wake=released");
+    if (!sensor_twt_compare_quiet_window()) goto invalid;
+    if (mmdrv_set_wake_enabled(true) != MMWLAN_SUCCESS) goto invalid;
+    sensor_halow_sleep_allowed = false;
+    /* Same peer/AID/VIF, descending through the SDK station states. No
+     * interface recreation, CONFIG_PS rewrite or rail cycling here. */
+    /* Wire values from SDK internal/mmdrv.h: ASSOCIATED=3, NOTEXIST=0. */
+    for (int state = 3; state >= 0; --state) {
+        if (!sensor_probe_sta_state((uint16_t)state)) goto invalid;
+    }
+    if (mmdrv_set_wake_enabled(false) != MMWLAN_SUCCESS) goto invalid;
+    sensor_halow_sleep_allowed = true;
+    sensor_twt_compare_phase = 4;
+    LOG_INF("TWT_COMPARE C TWT_removed station=notexist hold_until_reset rail=on host_wake=released CONFIG_PS_unchanged");
+#else
+    LOG_INF("TWT_COMPARE B removed hold_until_reset rail=on host_wake=released; station/CONFIG_PS unchanged");
+#endif
+    for (;;) {
+        if (k_msgq_get(&sensor_twt_queue, &event, K_FOREVER) == 0) {
+            LOG_ERR("TWT_COMPARE unexpected RX kind=%u; comparison invalid", event.msg.kind);
+            goto invalid;
+        }
+    }
+ invalid:
+    sensor_twt_compare_phase = 3;
+    sensor_halow_sleep_allowed = mmdrv_set_wake_enabled(false) == MMWLAN_SUCCESS;
+    LOG_ERR("TWT_COMPARE INVALID; retaining radio until reset; discard power comparison");
+    /* Do not enter normal failure cleanup: rail cutoff would make a failed
+     * command appear to have fixed native sleep. */
+    for (;;) k_sleep(K_FOREVER);
+}
+#endif
+
 static bool sensor_twt_pawr_test(void)
 {
     /* Re-enter on the normal sensor retry cycle after a disconnect. A
@@ -122,9 +240,18 @@ static bool sensor_twt_pawr_test(void)
     if (mmdrv_set_wake_enabled(true) != MMWLAN_SUCCESS ||
         !sensor_probe_long_sleep(false) || !sensor_probe_config_ps(false, false)) goto done;
     k_msgq_purge(&sensor_twt_queue);
+    /* Match umac_connection_set_bss_cfg(): station BSS configuration uses
+     * zero DTIM/CSSID, unlike the mesh/AP configuration used at radio start.
+     * PAwR's application-level CSSID remains in mesh_runtime.config. */
+    int bss_status = mesh_runtime.umac.driver->configure_bss(
+        mesh_runtime.umac.driver_ctx, mesh_runtime.umac.vif_id,
+        mesh_runtime.config.beacon_interval_tu, 0, 0);
+    LOG_INF("PAWR_TWT STA_BSS beacon_tu=%u dtim=0 cssid=0 sdk=%d",
+        mesh_runtime.config.beacon_interval_tu, bss_status);
+    if (bss_status != 0) goto done;
     /* The SDK programs LI_SLEEP at interface creation, then non-TIM after
-     * association. Two beacon intervals are 2.048 s with our 1000-TU BSS;
-     * this does not change the separately negotiated 2.000 s TWT agreement. */
+     * association. LI_SLEEP counts configured beacon intervals; this does
+     * not change the separately negotiated 2.000 s TWT agreement. */
     if (!sensor_twt_ps_contract(MORSE_CMD_ID_LI_SLEEP)) goto done;
     for (uint16_t state = 1; state <= 4; ++state) {
         if (!sensor_probe_sta_state(state)) goto done;
@@ -176,10 +303,23 @@ static bool sensor_twt_pawr_test(void)
     sensor_led_set_awake(false);
     uint64_t expires = offer.lease_ms ? offered_at + 3000000 + (uint64_t)offer.lease_ms * 1000 : UINT64_MAX;
     uint64_t release_at = sensor_twt_now_us();
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_MAC_SNAPSHOT)
+    uint64_t snapshot_at = release_at + 15000000;
+#endif
     LOG_INF("PAWR_TWT ACTIVE session=%u round_trip_us=%u lease_ms=%u monitor=0 scan=0 long_sleep=0 awake_control_ms=0 calibration=piggyback",
         offer.session, offer.round_trip_us, offer.lease_ms);
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_REMOVE_COMPARE)
+    sensor_twt_compare_hold();
+#endif
     for (;;) {
         uint64_t now = sensor_twt_now_us();
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_MAC_SNAPSHOT)
+        if (snapshot_at != UINT64_MAX && now >= snapshot_at) {
+            snapshot_at = UINT64_MAX;
+            sensor_twt_capture_mac();
+            now = sensor_twt_now_us();
+        }
+#endif
         if (led_until && now >= led_until) {
             sensor_led_set_awake(false);
             LOG_INF("PAWR_TWT LED off; five-second USER wake window ended");
@@ -187,11 +327,17 @@ static bool sensor_twt_pawr_test(void)
         }
         if (now >= expires) break;
         if (!host_released && now >= release_at) {
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_FORCE_SNOOZE)
+            sensor_twt_force_snooze();
+#endif
             if (mmdrv_set_wake_enabled(false) != MMWLAN_SUCCESS) goto done;
             sensor_halow_sleep_allowed = host_released = true;
             LOG_INF("PAWR_TWT host wake released; subsequent calibration runs only after RX");
         }
         uint64_t deadline = led_until && led_until < expires ? led_until : expires;
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_MAC_SNAPSHOT)
+        if (snapshot_at < deadline) deadline = snapshot_at;
+#endif
         if (!host_released && release_at < deadline) deadline = release_at;
         if (k_msgq_get(&sensor_twt_queue, &event, (deadline == UINT64_MAX ? K_FOREVER : K_USEC(deadline - now))) != 0) continue;
         if (memcmp(event.peer, sensor_probe_peer_mac, 6) ||
@@ -240,6 +386,9 @@ static bool sensor_twt_pawr_test(void)
             }
         }
         if (host_released) {
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_FORCE_SNOOZE)
+            sensor_twt_force_snooze();
+#endif
             enum mmwlan_status released = mmdrv_set_wake_enabled(false);
             LOG_INF("PAWR_TWT POST_TX host_release_sdk=%d", released);
             if (released != MMWLAN_SUCCESS) goto done;

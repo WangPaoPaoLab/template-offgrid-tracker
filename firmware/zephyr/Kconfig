@@ -152,6 +152,48 @@ config OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST
       TWT. Reject stale/mismatched replies and excessive timing uncertainty.
       Shut down the radio at expiry or failure. Does not prove RF sleep.
 
+config OFFGRID_NRF54_SENSOR_TWT_MAC_SNAPSHOT
+    bool "Capture MAC protocol diagnostics once after TWT setup"
+    depends on OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST
+    default n
+    help
+      After 15 quiet seconds, request MAC statistics once and retain the raw
+      response in RAM for debugger retrieval. This command wakes the host
+      transport; it is not a sleep-current measurement. No counter reset,
+      USER packets, repeated polling, or changes to the STA/TWT configuration.
+
+config OFFGRID_NRF54_SENSOR_TWT_FORCE_SNOOZE
+    bool "Probe native firmware SNOOZE while retaining the TWT schedule"
+    depends on OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST
+    default n
+    help
+      Factory experiment using Linux Morse FORCE_POWER_MODE (0x48), mode 0.
+      The SDK does not expose this command; firmware acceptance is checked.
+      Never selects deep sleep or hibernation, removes STA/TWT, cuts the rail,
+      or substitutes MCU timer wake. Current and RF wake require external tests.
+
+config OFFGRID_NRF54_SENSOR_TWT_REMOVE_COMPARE
+    bool "Compare retained station power with and without a TWT agreement"
+    depends on OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST
+    default n
+    help
+      Factory diagnostic: after negotiation, release host wake for 90 seconds,
+      then remove only flow 0 and release host wake again. Retain the radio
+      rail, station state and PS configuration until reset. No USER traffic
+      or periodic reports are processed during this comparison. Measure power
+      externally with the debugger disconnected. Command failure or USER
+      traffic marks the comparison invalid and holds the radio for inspection.
+
+config OFFGRID_NRF54_SENSOR_TWT_STATION_REMOVE_COMPARE
+    bool "Compare retained station versus station removed after TWT removal"
+    depends on OFFGRID_NRF54_SENSOR_TWT_REMOVE_COMPARE
+    default n
+    help
+      Start the comparison with flow 0 already removed. Keep the authorized
+      station for 90 seconds, then descend through states 3, 2, 1 and 0.
+      Release host wake and hold until reset, keeping the rail, VIF and
+      CONFIG_PS settings. This replaces the TWT-installed first phase.
+
 config OFFGRID_NRF54_SENSOR_PAWR_BULK_TEST
     bool "Run the connectionless PAwR bulk-transfer test"
     depends on OFFGRID_NRF54_ROLE_SENSOR
