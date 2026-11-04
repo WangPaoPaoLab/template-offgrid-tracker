@@ -15,12 +15,13 @@
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 #include <hal/nrf_gpio.h>
+#include "camera_ble_transport.h"
 
 #define CAMERA_NODE DT_ALIAS(camera0)
 #define CAMERA_RESPONSE_TIMEOUT_MS 2000
 #define CAMERA_CAPTURE_TIMEOUT_MS 10000
 #define CAMERA_STARTUP_DELAY_MS 4000
-#define CAMERA_READ_CHUNK_SIZE 256U
+#define CAMERA_READ_CHUNK_SIZE 512U
 #define CAMERA_MAX_JPEG_SIZE (512U * 1024U)
 #define CAMERA_RX_RING_SIZE 1024U
 
@@ -29,6 +30,22 @@ static uint8_t camera_rx_ring[CAMERA_RX_RING_SIZE];
 static volatile uint16_t camera_rx_head;
 static volatile uint16_t camera_rx_tail;
 static volatile uint32_t camera_rx_overruns;
+static uint8_t camera_dma_buffers[2][512];
+static uint8_t camera_dma_next;
+static volatile int camera_rx_error;
+
+/* Reflected IEEE CRC32, incremental and compatible with Python zlib.crc32. */
+static uint32_t camera_crc32_update(uint32_t crc, const uint8_t *data, size_t len)
+{
+	crc = ~crc;
+	for (size_t i = 0; i < len; i++) {
+		crc ^= data[i];
+		for (unsigned int bit = 0; bit < 8U; bit++) {
+			crc = (crc >> 1) ^ (0xEDB88320U & (0U - (crc & 1U)));
+		}
+	}
+	return ~crc;
+}
 
 static bool camera_rx_pop(uint8_t *value)
 {
@@ -44,40 +61,52 @@ static bool camera_rx_pop(uint8_t *value)
 	return true;
 }
 
-static void camera_uart_isr(const struct device *dev, void *user_data)
+static void camera_uart_event(const struct device *dev, struct uart_event *event,
+			      void *user_data)
 {
-	uint8_t data[32];
-
 	ARG_UNUSED(user_data);
-	while (uart_irq_update(dev) && uart_irq_is_pending(dev)) {
-		if (!uart_irq_rx_ready(dev)) {
-			continue;
-		}
-		int count = uart_fifo_read(dev, data, sizeof(data));
-
-		for (int i = 0; i < count; i++) {
+	switch (event->type) {
+	case UART_RX_RDY:
+		for (size_t i = 0; i < event->data.rx.len; i++) {
 			uint16_t next = (camera_rx_head + 1U) % CAMERA_RX_RING_SIZE;
 
 			if (next == camera_rx_tail) {
 				camera_rx_overruns++;
 				continue;
 			}
-			camera_rx_ring[camera_rx_head] = data[i];
+			camera_rx_ring[camera_rx_head] =
+				event->data.rx.buf[event->data.rx.offset + i];
 			camera_rx_head = next;
 		}
+		break;
+	case UART_RX_BUF_REQUEST:
+		if (uart_rx_buf_rsp(dev, camera_dma_buffers[camera_dma_next],
+				    sizeof(camera_dma_buffers[0])) != 0) {
+			camera_rx_error = -EIO;
+		}
+		camera_dma_next ^= 1U;
+		break;
+	case UART_RX_STOPPED:
+		camera_rx_error = -EIO;
+		break;
+	case UART_RX_DISABLED:
+		camera_rx_error = -EIO;
+		break;
+	default:
+		break;
 	}
 }
 
 static int camera_uart_rx_start(void)
 {
-	int rc = uart_irq_callback_user_data_set(camera_uart, camera_uart_isr,
-					     NULL);
+	int rc = uart_callback_set(camera_uart, camera_uart_event, NULL);
 
 	if (rc != 0) {
 		return rc;
 	}
-	uart_irq_rx_enable(camera_uart);
-	return 0;
+	camera_dma_next = 1U;
+	return uart_rx_enable(camera_uart, camera_dma_buffers[0],
+			      sizeof(camera_dma_buffers[0]), 1000);
 }
 
 static int camera_power_on(void)
@@ -95,6 +124,9 @@ static int camera_read_byte(uint8_t *value, int32_t timeout_ms)
 	const int64_t deadline = k_uptime_get() + timeout_ms;
 
 	do {
+		if (camera_rx_error != 0) {
+			return camera_rx_error;
+		}
 		if (camera_rx_pop(value)) {
 			return 0;
 		}
@@ -267,7 +299,13 @@ static int camera_set_640x480(void)
 
 static int camera_capture(void)
 {
+	static const uint8_t release[] = {0x56, 0x00, 0x36, 0x01, 0x03};
 	static const uint8_t command[] = {0x56, 0x00, 0x36, 0x01, 0x00};
+	int rc = camera_command_ack(release, sizeof(release), 0x36,
+				    CAMERA_RESPONSE_TIMEOUT_MS);
+	if (rc != 0) {
+		return rc;
+	}
 
 	return camera_command_ack(command, sizeof(command), 0x36,
 				  CAMERA_CAPTURE_TIMEOUT_MS);
@@ -298,20 +336,7 @@ static int camera_get_jpeg_length(uint32_t *jpeg_length)
 	return 0;
 }
 
-static void print_hex_bytes(const uint8_t *data, size_t length,
-			    uint32_t *column)
-{
-	for (size_t i = 0; i < length; i++) {
-		printk("%02X", data[i]);
-		(*column)++;
-		if (*column == 32U) {
-			printk("\n");
-			*column = 0U;
-		}
-	}
-}
-
-static int camera_read_and_print_jpeg(uint32_t jpeg_length)
+static int camera_read_and_send_jpeg(uint32_t jpeg_length)
 {
 	uint8_t command[] = {
 		0x56, 0x00, 0x32, 0x0C, 0x00, 0x0A,
@@ -324,9 +349,14 @@ static int camera_read_and_print_jpeg(uint32_t jpeg_length)
 	uint8_t first[2] = {0};
 	uint8_t last[2] = {0};
 	uint32_t offset = 0U;
-	uint32_t column = 0U;
+	uint32_t crc = 0U;
+	uint32_t overruns = camera_rx_overruns;
+	int rc = camera_ble_begin(jpeg_length);
+	if (rc != 0) {
+		return rc;
+	}
 
-	printk("IMAGE_HEX_BEGIN length=%u resolution=640x480\n", jpeg_length);
+	printk("camera: sending %u-byte JPEG over BLE\n", jpeg_length);
 	while (offset < jpeg_length) {
 		const uint32_t chunk = MIN(CAMERA_READ_CHUNK_SIZE,
 					   jpeg_length - offset);
@@ -364,22 +394,27 @@ static int camera_read_and_print_jpeg(uint32_t jpeg_length)
 			first[0] = data[0];
 			first[1] = data[1];
 		}
-		if (offset + chunk == jpeg_length) {
-			last[0] = data[chunk - 2U];
-			last[1] = data[chunk - 1U];
+		for (size_t i = 0; i < chunk; i++) {
+			last[0] = last[1];
+			last[1] = data[i];
 		}
-		print_hex_bytes(data, chunk, &column);
+		if (camera_rx_overruns != overruns) {
+			return -EOVERFLOW;
+		}
+		crc = camera_crc32_update(crc, data, chunk);
+		rc = camera_ble_data(offset, data, chunk);
+		if (rc != 0) {
+			return rc;
+		}
 		offset += chunk;
 	}
-	if (column != 0U) {
-		printk("\n");
+	if (first[0] != 0xFF || first[1] != 0xD8 ||
+	    last[0] != 0xFF || last[1] != 0xD9) {
+		return -EBADMSG;
 	}
-	printk("IMAGE_HEX_END length=%u jpeg=%s\n", jpeg_length,
-	       first[0] == 0xFF && first[1] == 0xD8 &&
-	       last[0] == 0xFF && last[1] == 0xD9 ? "valid" : "invalid");
-
-	return first[0] == 0xFF && first[1] == 0xD8 &&
-	       last[0] == 0xFF && last[1] == 0xD9 ? 0 : -EBADMSG;
+	printk("camera: BLE JPEG length=%u crc32=%08X RX overruns=%u\n",
+	       jpeg_length, crc, camera_rx_overruns - overruns);
+	return camera_ble_end(jpeg_length, crc);
 }
 
 int main(void)
@@ -395,12 +430,12 @@ int main(void)
 	uint32_t jpeg_length;
 	int rc;
 
-	printk("Putal/VC0706-compatible camera test: UART=921600, resolution=640x480\n");
 	rc = camera_power_on();
 	if (rc != 0) {
 		printk("camera: immediate power enable failed rc=%d\n", rc);
 		return rc;
 	}
+	printk("Putal/VC0706-compatible BLE camera: UART=921600, resolution=640x480\n");
 	printk("camera: power enabled on P1.09 immediately after boot\n");
 	printk("camera: waiting %u ms before any application UART call\n",
 	       CAMERA_STARTUP_DELAY_MS);
@@ -423,10 +458,10 @@ int main(void)
 		printk("camera: trying UART=%u 8N1\n", baud_rates[i]);
 		rc = camera_uart_rx_start();
 		if (rc != 0) {
-			printk("camera: interrupt RX start failed rc=%d\n", rc);
+			printk("camera: DMA RX start failed rc=%d\n", rc);
 			continue;
 		}
-		printk("camera: interrupt-driven RX ring enabled (%u bytes)\n",
+		printk("camera: double-buffered DMA RX ring enabled (%u bytes)\n",
 		       CAMERA_RX_RING_SIZE);
 		k_msleep(50);
 		rc = camera_reset();
@@ -465,24 +500,22 @@ int main(void)
 		printk("camera: set resolution failed rc=%d\n", rc);
 		return rc;
 	}
-	rc = camera_capture();
+	rc = camera_ble_init();
 	if (rc != 0) {
-		printk("camera: capture failed rc=%d\n", rc);
+		printk("camera: BLE initialization failed rc=%d\n", rc);
 		return rc;
 	}
-	rc = camera_get_jpeg_length(&jpeg_length);
-	if (rc != 0) {
-		printk("camera: read JPEG length failed rc=%d\n", rc);
-		return rc;
+	while (true) {
+		camera_ble_wait_request();
+		rc = camera_capture();
+		if (rc == 0) {
+			rc = camera_get_jpeg_length(&jpeg_length);
+		}
+		if (rc == 0) {
+			rc = camera_read_and_send_jpeg(jpeg_length);
+		}
+		camera_ble_finish(rc);
 	}
-	printk("camera: captured %u-byte JPEG; printing hex\n", jpeg_length);
-	rc = camera_read_and_print_jpeg(jpeg_length);
-	if (rc != 0) {
-		printk("camera: JPEG transfer failed rc=%d\n", rc);
-		return rc;
-	}
-	printk("camera: capture complete\n");
-	return 0;
 }
 
 #endif /* CONFIG_OFFGRID_NRF54_CAMERA_TEST */

@@ -126,13 +126,12 @@ pio run -e seeed-xiao-nrf54l15-sense
 ### nRF54L15 VC0706-compatible camera test
 
 `edgez-nrf54l15-vc0706-camera-test` replaces the L76K on the FGH200M UART
-connector with a 3.3 V TTL serial camera. P1.09 enables camera power; connect
-camera RXD to P1.11 and TXD to P1.12. The UART runs at 921600 baud. The target
-waits four seconds after enabling power, selects the protocol's
-supported 320x240 mode (there is no 320x480 mode), captures one JPEG, and
-prints its complete contents between `IMAGE_HEX_BEGIN` and `IMAGE_HEX_END` on
-the SEGGER RTT console. Each text line contains 32 image bytes as 64 hex
-characters.
+connector with a TTL serial camera. P1.09 enables camera power immediately
+in `main()`. Connect camera RXD to P1.12 (MCU TX) and TXD to P1.11 (MCU RX).
+The UART runs at 921600 baud, 8N1, with double-buffered DMA RX feeding a ring. The target
+waits four seconds after enabling power, resets the camera, waits another
+four seconds, checks its version, and selects 640x480. It then advertises as
+`EdgeZ-Camera` and waits for a BLE capture request. HaLow stays disabled.
 
 ```sh
 cd firmware
@@ -140,14 +139,50 @@ pio run -e edgez-nrf54l15-vc0706-camera-test
 pio run -e edgez-nrf54l15-vc0706-camera-test -t upload
 ```
 
-Save the RTT console output and rebuild the JPEG with:
+This environment's upload hook commits the final nRF54L15 RRAM write buffer
+and verifies the HEX contents before reset. The stock Seeed `load_image`
+sequence can otherwise discard a partial final write and corrupt static data.
+
+Receive a fresh photo on a computer with Bluetooth:
 
 ```sh
-python3 scripts/vc0706_hex_to_jpeg.py camera-rtt.log capture.jpg
+python3 -m venv .venv-camera
+.venv-camera/bin/python -m pip install -r scripts/requirements-camera-ble.txt
+.venv-camera/bin/python scripts/camera_ble_capture.py capture.jpg
 ```
 
-The converter checks the declared byte count and JPEG `FFD8`/`FFD9` markers
-before writing the image.
+On Windows use `.venv-camera\Scripts\python` instead. Allow Bluetooth access
+for your terminal/Python when the OS prompts. The script scans, connects,
+subscribes, and requests one new photo. It checks every chunk's offset,
+transfer ID, total byte count, CRC32, JPEG SOI/EOI markers, and actual 640x480
+SOF dimensions before publishing `capture.jpg`. An existing output file is
+replaced only after verification. Run it again for another photo. Use
+`--address ADDRESS` to select a specific board (a CoreBluetooth device UUID
+on macOS), `--scan-timeout 30`, or `--timeout 180` when needed.
+
+JPEG data travels as binary BLE notifications; RTT contains status only.
+UART reads stay in 512-byte chunks and BLE frames adapt to the negotiated
+ATT MTU, up to 300 bytes (297-byte notification, at most 288 JPEG bytes per
+frame), including the default 23-byte MTU. The computer also negotiates the
+MTU and may choose a smaller value. The camera's previous frame is
+released before each capture. A disconnect or failed transfer can be retried
+by reconnecting and requesting a new capture.
+
+Camera GATT service UUID: `a3632000-b82e-44c2-9b1d-a790675b4ac1`.
+Write `01` to control characteristic `a3632001-...` after subscribing to data
+characteristic `a3632002-...`. This local diagnostic service does not require
+pairing. Notifications use little-endian fields:
+
+| Type | Fields after the one-byte type |
+| --- | --- |
+| `01` START | transfer ID u32, JPEG length u32, width u16, height u16 |
+| `02` DATA | transfer ID u32, byte offset u32, binary JPEG bytes |
+| `03` END | transfer ID u32, JPEG length u32, IEEE CRC32 u32 |
+| `04` ERROR | transfer ID u32, signed firmware error i32 |
+
+Receiver validation tests: `python3 -m unittest discover -s scripts/tests -p test_camera_ble_capture.py`.
+The old `vc0706_hex_to_jpeg.py` utility remains available for saved logs from
+the earlier RTT-hex firmware.
 
 ### HT-HC33 mesh power-save experiment
 

@@ -64,6 +64,7 @@ endif()
 if(CONFIG_OFFGRID_NRF54_CAMERA_TEST)
 	target_sources(app PRIVATE
 		"${CMAKE_CURRENT_LIST_DIR}/../nrf54/src/vc0706_camera_test.c"
+		"${CMAKE_CURRENT_LIST_DIR}/../nrf54/src/camera_ble_transport.c"
 	)
 else()
 	target_sources(app PRIVATE
