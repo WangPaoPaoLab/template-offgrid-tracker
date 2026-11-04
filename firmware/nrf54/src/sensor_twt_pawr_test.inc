@@ -5,17 +5,46 @@ static uint64_t sensor_twt_now_us(void)
     return k_ticks_to_us_floor64(k_uptime_ticks());
 }
 
+static bool sensor_twt_ps_contract(uint16_t command_id)
+{
+    struct morse_cmd_req_li_sleep li = MORSE_COMMAND_INIT(li,
+        MORSE_CMD_ID_LI_SLEEP, mesh_runtime.umac.vif_id,
+        .listen_interval = htole32(2));
+    struct morse_cmd_req_get_set_generic_param non_tim = MORSE_COMMAND_INIT(non_tim,
+        MORSE_CMD_ID_GET_SET_GENERIC_PARAM, mesh_runtime.umac.vif_id,
+        .param_id = htole32(MORSE_CMD_PARAM_ID_NON_TIM_MODE),
+        .action = htole32(MORSE_CMD_PARAM_ACTION_SET), .value = htole32(1));
+    struct { struct morse_cmd_resp resp; uint8_t extra[112]; } reply = {0};
+    uint32_t len = sizeof(reply);
+    enum mmwlan_status sdk = mmdrv_execute_command(
+        command_id == MORSE_CMD_ID_LI_SLEEP ? (uint8_t *)&li : (uint8_t *)&non_tim,
+        (uint8_t *)&reply, &len);
+    bool valid = (sdk == MMWLAN_SUCCESS || sdk == MMWLAN_COMMAND_ERROR) &&
+        len >= sizeof(reply.resp) && len <= sizeof(reply) &&
+        le16toh(reply.resp.hdr.message_id) == command_id &&
+        le16toh(reply.resp.hdr.vif_id) == mesh_runtime.umac.vif_id;
+    LOG_INF("PAWR_TWT PS_CONTRACT cmd=0x%04x sdk=%d valid=%u fw=%d bytes=%u",
+        command_id, sdk, valid,
+        (int)(valid ? (int32_t)le32toh(reply.resp.status) : INT32_MIN), len);
+    return valid && sdk == MMWLAN_SUCCESS && le32toh(reply.resp.status) == 0;
+}
+
 static bool sensor_twt_send(const struct edgez_pawr_twt *msg)
 {
     uint8_t payload[EDGEZ_PAWR_TWT_LENGTH];
-    uint8_t packet[EDGEZ_PAWR_HEADER_LENGTH + sizeof(payload)];
+    uint8_t packet[EDGEZ_PAWR_HEADER_LENGTH + EDGEZ_PAWR_TWT_TRAILER_LENGTH];
     uint8_t frame[EDGEZ_PAWR_ACTION_HEADER_LENGTH + sizeof(packet)];
     size_t packet_len, frame_len;
-    if (!edgez_pawr_twt_encode(payload, sizeof(payload), msg) ||
+    if (msg->kind == EDGEZ_PAWR_TWT_HIT) {
+        if (!edgez_pawr_encode_response(packet, sizeof(packet),
+                edgez_pawr_payload_hash(sensor_remote_wake_payload, sizeof(sensor_remote_wake_payload)),
+                mesh_runtime.config.compressed_ssid, &packet_len) ||
+            !edgez_pawr_twt_append(packet, sizeof(packet), &packet_len, msg)) return false;
+    } else if (!edgez_pawr_twt_encode(payload, sizeof(payload), msg) ||
         !edgez_pawr_encode_typed_request(packet, sizeof(packet), EDGEZ_PAWR_REQUEST_TWT_CONTROL,
             ++pawr_request_id, 0, mesh_runtime.config.compressed_ssid,
-            payload, sizeof(payload), &packet_len) ||
-        !edgez_pawr_encode_action_frame(frame, sizeof(frame), pawr_sequence_number++,
+            payload, sizeof(payload), &packet_len)) return false;
+    if (!edgez_pawr_encode_action_frame(frame, sizeof(frame), pawr_sequence_number++,
             mesh_runtime.radio_info.mac_addr, sensor_probe_peer_mac,
             packet, packet_len, &frame_len)) return false;
     const struct edgez_umac_tx_request tx = {
@@ -43,9 +72,8 @@ static bool sensor_twt_wait(const struct edgez_pawr_twt *offer, uint8_t kind,
 
 static bool sensor_twt_pawr_test(void)
 {
-    static bool ran;
-    if (ran) return false;
-    ran = true;
+    /* Re-enter on the normal sensor retry cycle after a disconnect. A
+     * one-shot boot latch would permanently lose USER wake after expiry. */
     uint16_t monitor = UINT16_MAX;
     bool monitor_on = false, scanning = false, installed = false;
     struct sensor_twt_event event;
@@ -73,7 +101,7 @@ static bool sensor_twt_pawr_test(void)
             atomic_set(&sensor_probe_peer_seen, 1);
             offer = (struct edgez_pawr_twt) {
                 .kind = EDGEZ_PAWR_TWT_OFFER, .session = event.msg.session,
-                .interval_us = 2000000, .duration_us = 50176, .lease_ms = 30000,
+                .interval_us = 2000000, .duration_us = 50176, .lease_ms = 0,
             };
             discovered = true;
             break;
@@ -84,9 +112,18 @@ static bool sensor_twt_pawr_test(void)
     scanning = false;
     if (!sensor_probe_monitor(&monitor, false)) goto done;
     monitor_on = false;
-    for (uint16_t state = 1; state <= 4; ++state)
+    /* The SDK programs LI_SLEEP at interface creation, then non-TIM after
+     * association. Two beacon intervals are 2.048 s with our 1000-TU BSS;
+     * this does not change the separately negotiated 2.000 s TWT agreement. */
+    if (!sensor_twt_ps_contract(MORSE_CMD_ID_LI_SLEEP)) goto done;
+    for (uint16_t state = 1; state <= 4; ++state) {
         if (!sensor_probe_sta_state(state)) goto done;
-    if (!sensor_probe_config_ps(true, false)) goto done;
+        if (state == 3 && !sensor_twt_ps_contract(MORSE_CMD_ID_GET_SET_GENERIC_PARAM)) goto done;
+    }
+    /* Match mmdrv_set_chip_power_save_enabled(): delegate dynamic PS to
+     * firmware. Linux uses PS_NULLFUNC_STACK when offload is disabled;
+     * this stateless host does not implement that PM-null state machine. */
+    if (!sensor_probe_config_ps(true, true)) goto done;
     /* Clock mapping must be supported and advancing before any install. */
     uint64_t previous;
     if (!sensor_probe_get_tsf(&previous)) goto done;
@@ -124,12 +161,12 @@ static bool sensor_twt_pawr_test(void)
         if (sensor_twt_wait(&offer, EDGEZ_PAWR_TWT_READY, &event, 200)) { ready = true; break; }
     }
     if (!ready) { LOG_ERR("PAWR_TWT ready timeout"); goto done; }
-    /* First verify pace while deliberately awake. Read radio TSF for each
-     * sparse probe, then release host wake between received probes. */
+    /* Release host wake after setup. Only actual PAwR USER traffic supplies
+     * timing samples; silence does not expire the installed agreement. */
     sensor_led_set_awake(false);
-    uint64_t expires = offered_at + 3000000 + (uint64_t)offer.lease_ms * 1000;
-    uint64_t release_at = offered_at + 13000000;
-    LOG_INF("PAWR_TWT ACTIVE session=%u round_trip_us=%u lease_ms=%u monitor=0 scan=0 long_sleep=0 awake_control_ms=10000",
+    uint64_t expires = offer.lease_ms ? offered_at + 3000000 + (uint64_t)offer.lease_ms * 1000 : UINT64_MAX;
+    uint64_t release_at = sensor_twt_now_us();
+    LOG_INF("PAWR_TWT ACTIVE session=%u round_trip_us=%u lease_ms=%u monitor=0 scan=0 long_sleep=0 awake_control_ms=0 calibration=piggyback",
         offer.session, offer.round_trip_us, offer.lease_ms);
     for (;;) {
         uint64_t now = sensor_twt_now_us();
@@ -146,7 +183,12 @@ static bool sensor_twt_pawr_test(void)
         }
         uint64_t deadline = led_until && led_until < expires ? led_until : expires;
         if (!host_released && release_at < deadline) deadline = release_at;
-        if (k_msgq_get(&sensor_twt_queue, &event, K_USEC(deadline - now)) != 0) continue;
+        if (k_msgq_get(&sensor_twt_queue, &event, (deadline == UINT64_MAX ? K_FOREVER : K_USEC(deadline - now))) != 0) continue;
+        if (!memcmp(event.peer, sensor_probe_peer_mac, 6) &&
+            event.msg.kind == EDGEZ_PAWR_TWT_HELLO && event.msg.session != offer.session) {
+            LOG_INF("PAWR_TWT peer restarted; renegotiating on sensor retry cycle");
+            break;
+        }
         if (memcmp(event.peer, sensor_probe_peer_mac, 6) ||
             !edgez_pawr_twt_same_schedule(&offer, &event.msg) ||
             event.msg.round_trip_us != offer.round_trip_us) continue;
@@ -154,9 +196,9 @@ static bool sensor_twt_pawr_test(void)
         if (event.msg.kind != EDGEZ_PAWR_TWT_PROBE) continue;
         if (event.msg.echo_host_us <= last_probe_us) continue;
         last_probe_us = event.msg.echo_host_us;
-        expires = sensor_twt_now_us() + (uint64_t)offer.lease_ms * 1000;
-        if ((event.msg.sequence & 0x7fffffffU) >=
-            (offer.lease_ms * 1000U / offer.interval_us) * 2U) continue;
+        if (offer.lease_ms) expires = sensor_twt_now_us() + (uint64_t)offer.lease_ms * 1000;
+        if ((event.msg.sequence & 0x7fffffffU) >= 30U ||
+            !(event.msg.sequence & 0x80000000U)) continue;
         if (event.msg.sequence & 0x80000000U) {
             sensor_led_set_awake(true);
             led_until = sensor_twt_now_us() + 5000000;
@@ -193,7 +235,7 @@ static bool sensor_twt_pawr_test(void)
             }
         }
         if (host_released && mmdrv_set_wake_enabled(false) != MMWLAN_SUCCESS) goto done;
-        /* This is timing calibration traffic. Current is measured externally;
+        /* Timing feedback piggybacks on the USER request hash ACK. Current is measured externally;
          * no GPIO, BUSY or packet counters infer the RF sleep state. */
     }
     LOG_INF("PAWR_TWT EXPIRED received_inside=%u received_outside=%u", inside, outside);

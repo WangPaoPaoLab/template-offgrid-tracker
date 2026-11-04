@@ -893,6 +893,26 @@ static int join_ignore_unsupported(void *ctx,
 			radio->data, radio->length, &action)) {
 		return EDGEZ_UMAC_OK;
 	}
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST)
+	if (sensor_factory_wake_mode) {
+		struct sensor_twt_event event = { .received_us = k_ticks_to_us_floor64(k_uptime_ticks()) };
+		size_t base;
+		if (edgez_pawr_twt_unwrap(action.payload, action.payload_length, &base, &event.msg)) {
+			if (edgez_pawr_decode_request(action.payload, base, &request) &&
+			    request.type == EDGEZ_PAWR_REQUEST_MESH_PACKET &&
+			    request.compressed_ssid == mesh_runtime.config.compressed_ssid &&
+			    request.payload_length == sizeof(sensor_remote_wake_payload) &&
+			    !memcmp(request.payload, sensor_remote_wake_payload, sizeof(sensor_remote_wake_payload)) &&
+			    event.msg.kind == EDGEZ_PAWR_TWT_PROBE && (event.msg.sequence & 0x80000000U) &&
+			    !(action.source[0] & 1U) && memcmp(action.source, "\0\0\0\0\0\0", 6) &&
+			    !memcmp(action.destination, mesh_runtime.radio_info.mac_addr, 6)) {
+				memcpy(event.peer, action.source, 6);
+				(void)k_msgq_put(&sensor_twt_queue, &event, K_NO_WAIT);
+			}
+			return EDGEZ_UMAC_OK;
+		}
+	}
+#endif
 	decoded_request = edgez_pawr_decode_request(
 		action.payload, action.payload_length, &request);
 	if (decoded_request) {
@@ -907,7 +927,8 @@ static int join_ignore_unsupported(void *ctx,
 			    memcmp(action.source, "\0\0\0\0\0\0", 6) != 0 &&
 			    (memcmp(action.destination, broadcast, 6) == 0 ||
 			     memcmp(action.destination, mesh_runtime.radio_info.mac_addr, 6) == 0) &&
-			    edgez_pawr_twt_decode(request.payload, request.payload_length, &event.msg)) {
+			    edgez_pawr_twt_decode(request.payload, request.payload_length, &event.msg) &&
+			    event.msg.kind != EDGEZ_PAWR_TWT_PROBE && event.msg.kind != EDGEZ_PAWR_TWT_HIT) {
 				memcpy(event.peer, action.source, 6);
 				(void)k_msgq_put(&sensor_twt_queue, &event, K_NO_WAIT);
 			}

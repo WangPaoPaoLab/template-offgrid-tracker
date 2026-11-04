@@ -20,7 +20,8 @@ def main():
     parser.add_argument('--jlink-serial', type=int, default=607000398)
     parser.add_argument('--jlink-library', default='/Applications/SEGGER/JLink/libjlinkarm.dylib')
     parser.add_argument('--seconds', type=float, default=50)
-    parser.add_argument('--mode', choices=('sparse', 'quiet', 'button'), default='sparse')
+    parser.add_argument('--mode', choices=('button', 'piggyback'), default='piggyback')
+    parser.add_argument('--wake-count', type=int, default=1, help='Number of actual USER-equivalent commands, eight seconds apart')
     parser.add_argument('--log', type=Path, required=True)
     parser.add_argument('--leave-running', action='store_true', help='Detach without cancelling the negotiated session')
     args = parser.parse_args()
@@ -35,6 +36,10 @@ def main():
     trigger_at = None
     triggered = False
     stopped = False
+    wake_count = 0
+    unexpected_tx = 0
+    stats_count = 0
+    active_resets = 0
     led_checks = []
     started = time.monotonic()
     try:
@@ -55,6 +60,7 @@ def main():
                         record = f'{time.monotonic() - started:.3f} [{name}] {line}\n'
                         output.write(record)
                         if name == 'NRF' and '*** Booting Zephyr' in line:
+                            if active: active_resets += 1
                             active.clear()
                             expired = False
                             inside = outside = 0
@@ -62,7 +68,7 @@ def main():
                             triggered = False
                         if 'PAWR_TWT' in line or 'TWT_TSF' in line or 'TWT_PROBE cmd' in line:
                             print(record, end='', flush=True)
-                        if name == 'NRF' and ('PAWR_TWT LED on' in line or 'PAWR_TWT LED off' in line):
+                        if name == 'NRF' and name in active and ('PAWR_TWT LED on' in line or 'PAWR_TWT LED off' in line):
                             # Board DTS: active-low LED at P2.05. Nordic MDK:
                             # GPIO2 base=0x50050400, OUT=0, DIR=0x10.
                             out = link.memory_read32(0x50050400, 1)[0]
@@ -78,8 +84,12 @@ def main():
                             if match:
                                 active[name] = int(match.group(1))
                             if name == 'HC33' and trigger_at is None:
-                                trigger_at = time.monotonic() + (18 if args.mode == 'button' else 0)
-                        if name == 'NRF' and 'PAWR_TWT RX sequence=' in line:
+                                trigger_at = time.monotonic() + (35 if args.mode == 'piggyback' else 18)
+                        if name == 'HC33' and 'PAWR_TWT TX sequence=' in line:
+                            match = re.search(r'sequence=(\d+)', line)
+                            if not wake_count or not match or not (int(match.group(1)) & 0x80000000): unexpected_tx += 1
+                        if name == 'HC33' and 'PAWR_TWT STATS' in line: stats_count += 1
+                        if name == 'NRF' and name in active and 'PAWR_TWT RX sequence=' in line:
                             if 'planned=inside' in line:
                                 inside += 1
                             elif 'planned=outside' in line:
@@ -89,10 +99,14 @@ def main():
                             match = re.search(r'received_inside=(\d+) received_outside=(\d+)', line)
                             if match:
                                 inside, outside = map(int, match.groups())
-                if trigger_at is not None and not triggered and time.monotonic() >= trigger_at:
-                    port.write(b'q' if args.mode == 'quiet' else b'w' if args.mode == 'button' else b't')
+                if trigger_at is not None and wake_count < args.wake_count and time.monotonic() >= trigger_at + 8 * wake_count:
+                    port.write(b'w')
+                    wake_count += 1
                     triggered = True
-                if not args.leave_running and triggered and not stopped and args.mode != 'quiet' and time.monotonic() - trigger_at > (10 if args.mode == 'button' else 35):
+                    record = f'{time.monotonic() - started:.3f} [TEST] USER command {wake_count}\n'
+                    output.write(record)
+                    print(record, end='', flush=True)
+                if not args.leave_running and triggered and not stopped and time.monotonic() - trigger_at > 8 * args.wake_count + 2:
                     port.write(b'x')
                     stopped = True
                 output.flush()
@@ -106,13 +120,19 @@ def main():
             port.close()
         try:
             link.rtt_stop()
+        except pylink.errors.JLinkException:
+            # Preserve the original capture failure if the user disconnected
+            # the probe for external power measurement during the run.
+            pass
         finally:
             link.close()
     negotiated = set(active) == {'NRF', 'HC33'} and active['NRF'] == active['HC33']
     print(f'RESULT negotiated={negotiated} expired={expired} '
           f'inside={inside} outside={outside} LED_GPIO={led_checks}; current measured externally')
-    led_ok = args.mode != 'button' or len(led_checks) >= 2 and all(led_checks)
-    return 0 if negotiated and (expired or args.leave_running) and led_ok and (args.mode == 'quiet' or inside > 0) else 1
+    led_ok = len(led_checks) >= 2 * args.wake_count and all(led_checks)
+    print(f'PIGGYBACK commands={wake_count} acknowledgements={stats_count} unexpected_tx={unexpected_tx} active_resets={active_resets}')
+    return 0 if negotiated and (not expired if args.leave_running else expired) and led_ok and inside >= args.wake_count and stats_count >= args.wake_count and not unexpected_tx and not active_resets else 1
+
 
 
 if __name__ == '__main__':
