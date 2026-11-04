@@ -59,6 +59,7 @@ if(CONFIG_WIFI_MORSEMICRO_EDGEZ_JOIN_ONLY)
 		"${MORSE_ZEPHYR_MODULE}/components/morsemicro/libmorse_interface/include"
 		"${MORSE_ZEPHYR_MODULE}/submodules/mm-iot-edgez/include"
 		"${MORSE_ZEPHYR_MODULE}/submodules/edgez-rf-api/include"
+		"${MORSE_ZEPHYR_MODULE}/submodules/edgez-rf-morsemicro/include"
 		"${MORSE_ZEPHYR_MODULE}/submodules/mm-iot-sdk/framework/morselib/include"
 	)
 endif()
