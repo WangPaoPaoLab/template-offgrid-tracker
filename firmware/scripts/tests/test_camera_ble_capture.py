@@ -53,6 +53,19 @@ class TransferTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "dimensions"):
             receiver.feed(struct.pack("<BIII", 3, 7, len(image), zlib.crc32(image)))
 
+    def test_selected_720p_resolution(self):
+        image = JPEG.replace(bytes.fromhex("01E00280"), bytes.fromhex("02D00500"))
+        receiver = camera.ImageReceiver((1280, 720))
+        receiver.feed(struct.pack("<BIIHH", 1, 9, len(image), 1280, 720))
+        receiver.feed(struct.pack("<BII", 2, 9, 0) + image)
+        self.assertEqual(receiver.feed(struct.pack(
+            "<BIII", 3, 9, len(image), zlib.crc32(image))), image)
+
+    def test_start_resolution_must_match_request(self):
+        with self.assertRaisesRegex(ValueError, "requested dimensions"):
+            camera.ImageReceiver((1280, 720)).feed(
+                struct.pack("<BIIHH", 1, 9, len(JPEG), 640, 480))
+
     def test_error_before_start(self):
         with self.assertRaisesRegex(RuntimeError, "rc=-116"):
             camera.ImageReceiver().feed(struct.pack("<BIi", 4, 7, -116))

@@ -130,7 +130,7 @@ connector with a TTL serial camera. P1.09 enables camera power immediately
 in `main()`. Connect camera RXD to P1.12 (MCU TX) and TXD to P1.11 (MCU RX).
 The UART runs at 921600 baud, 8N1, with double-buffered DMA RX feeding a ring. The target
 waits four seconds after enabling power, resets the camera, waits another
-four seconds, checks its version, and selects 640x480. It then advertises as
+four seconds, and checks its version. It then advertises as
 `EdgeZ-Camera` and waits for a BLE capture request. HaLow stays disabled.
 
 ```sh
@@ -149,13 +149,16 @@ Receive a fresh photo on a computer with Bluetooth:
 python3 -m venv .venv-camera
 .venv-camera/bin/python -m pip install -r scripts/requirements-camera-ble.txt
 .venv-camera/bin/python scripts/camera_ble_capture.py capture.jpg
+.venv-camera/bin/python scripts/camera_ble_capture.py photo-720p.jpg --resolution 1280x720
+.venv-camera/bin/python scripts/camera_ble_capture.py photo-small.jpg --resolution 320x240
 ```
 
 On Windows use `.venv-camera\Scripts\python` instead. Allow Bluetooth access
 for your terminal/Python when the OS prompts. The script scans, connects,
-subscribes, and requests one new photo. It checks every chunk's offset,
-transfer ID, total byte count, CRC32, JPEG SOI/EOI markers, and actual 640x480
-SOF dimensions before publishing `capture.jpg`. An existing output file is
+subscribes, sets the requested resolution and triggers one new photo. The
+default is 640x480. It checks every chunk's offset, transfer ID, total byte
+count, CRC32, JPEG SOI/EOI markers, and actual JPEG SOF dimensions against the
+request before publishing the JPEG. An existing output file is
 replaced only after verification. Run it again for another photo. Use
 `--address ADDRESS` to select a specific board (a CoreBluetooth device UUID
 on macOS), `--scan-timeout 30`, or `--timeout 180` when needed.
@@ -165,13 +168,24 @@ UART reads stay in 512-byte chunks and BLE frames adapt to the negotiated
 ATT MTU, up to 300 bytes (297-byte notification, at most 288 JPEG bytes per
 frame), including the default 23-byte MTU. The computer also negotiates the
 MTU and may choose a smaller value. The camera's previous frame is
-released before each capture. A disconnect or failed transfer can be retried
+released, resolution is set, and the sensor is allowed 250 ms to settle before
+each capture. A disconnect or failed transfer can be retried
 by reconnecting and requesting a new capture.
 
+Resolution choices: `160x120`, `320x240`, `640x480`, `1024x768`, `1280x720`,
+`1280x960`, `1600x1200`, `1920x1080`, `2304x1296`. These are Putal protocol
+modes up to 3 MP; availability depends on the camera model/firmware. A camera
+that rejects a setting or returns the wrong JPEG dimensions causes an error;
+the script does not save a mismatched photo. Images are limited to 512 KiB.
+
 Camera GATT service UUID: `a3632000-b82e-44c2-9b1d-a790675b4ac1`.
-Write `01` to control characteristic `a3632001-...` after subscribing to data
-characteristic `a3632002-...`. This local diagnostic service does not require
-pairing. Notifications use little-endian fields:
+After subscribing to data characteristic `a3632002-...`, write
+`01 <width u16 LE> <height u16 LE>` to control characteristic `a3632001-...`
+to set resolution and trigger a capture. For example, 1280x720 is
+`01 00 05 D0 02`. The legacy one-byte `01` command captures at the last
+requested resolution (initially 640x480). Invalid sizes and overlapping
+capture requests are rejected. This local diagnostic service does not
+require pairing. Notifications use little-endian fields:
 
 | Type | Fields after the one-byte type |
 | --- | --- |

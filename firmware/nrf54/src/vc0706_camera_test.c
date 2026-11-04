@@ -16,6 +16,7 @@
 #include <zephyr/sys/util.h>
 #include <hal/nrf_gpio.h>
 #include "camera_ble_transport.h"
+#include "camera_resolutions.h"
 
 #define CAMERA_NODE DT_ALIAS(camera0)
 #define CAMERA_RESPONSE_TIMEOUT_MS 2000
@@ -286,26 +287,33 @@ static int camera_query_version(void)
 	return 0;
 }
 
-static int camera_set_640x480(void)
+static int camera_set_resolution(uint16_t width, uint16_t height)
 {
-	/* Protocol V1.14: field 0x04 plus 0x19,0x00 selects 640x480. */
-	static const uint8_t command[] = {
+	const struct camera_resolution *mode = camera_resolution_find(width, height);
+	uint8_t command[] = {
 		0x56, 0x00, 0x31, 0x05, 0x04, 0x01, 0x00, 0x19, 0x00,
 	};
+	if (mode == NULL) {
+		return -EINVAL;
+	}
+	command[4] = mode->field;
+	command[8] = mode->code;
+	printk("camera: setting resolution %ux%u\n", width, height);
 
 	return camera_command_ack(command, sizeof(command), 0x31,
 				  CAMERA_RESPONSE_TIMEOUT_MS);
 }
 
-static int camera_capture(void)
+static int camera_release_frame(void)
 {
 	static const uint8_t release[] = {0x56, 0x00, 0x36, 0x01, 0x03};
+	return camera_command_ack(release, sizeof(release), 0x36,
+				  CAMERA_RESPONSE_TIMEOUT_MS);
+}
+
+static int camera_capture(void)
+{
 	static const uint8_t command[] = {0x56, 0x00, 0x36, 0x01, 0x00};
-	int rc = camera_command_ack(release, sizeof(release), 0x36,
-				    CAMERA_RESPONSE_TIMEOUT_MS);
-	if (rc != 0) {
-		return rc;
-	}
 
 	return camera_command_ack(command, sizeof(command), 0x36,
 				  CAMERA_CAPTURE_TIMEOUT_MS);
@@ -336,7 +344,8 @@ static int camera_get_jpeg_length(uint32_t *jpeg_length)
 	return 0;
 }
 
-static int camera_read_and_send_jpeg(uint32_t jpeg_length)
+static int camera_read_and_send_jpeg(uint32_t jpeg_length, uint16_t width,
+				     uint16_t height)
 {
 	uint8_t command[] = {
 		0x56, 0x00, 0x32, 0x0C, 0x00, 0x0A,
@@ -351,7 +360,7 @@ static int camera_read_and_send_jpeg(uint32_t jpeg_length)
 	uint32_t offset = 0U;
 	uint32_t crc = 0U;
 	uint32_t overruns = camera_rx_overruns;
-	int rc = camera_ble_begin(jpeg_length);
+	int rc = camera_ble_begin(jpeg_length, width, height);
 	if (rc != 0) {
 		return rc;
 	}
@@ -428,6 +437,8 @@ int main(void)
 		.flow_ctrl = UART_CFG_FLOW_CTRL_NONE,
 	};
 	uint32_t jpeg_length;
+	uint16_t width;
+	uint16_t height;
 	int rc;
 
 	rc = camera_power_on();
@@ -435,7 +446,7 @@ int main(void)
 		printk("camera: immediate power enable failed rc=%d\n", rc);
 		return rc;
 	}
-	printk("Putal/VC0706-compatible BLE camera: UART=921600, resolution=640x480\n");
+	printk("Putal/VC0706-compatible BLE camera: UART=921600, resolution selectable over BLE\n");
 	printk("camera: power enabled on P1.09 immediately after boot\n");
 	printk("camera: waiting %u ms before any application UART call\n",
 	       CAMERA_STARTUP_DELAY_MS);
@@ -495,24 +506,26 @@ int main(void)
 	}
 	printk("camera: version query succeeded; protocol link verified\n");
 
-	rc = camera_set_640x480();
-	if (rc != 0) {
-		printk("camera: set resolution failed rc=%d\n", rc);
-		return rc;
-	}
 	rc = camera_ble_init();
 	if (rc != 0) {
 		printk("camera: BLE initialization failed rc=%d\n", rc);
 		return rc;
 	}
 	while (true) {
-		camera_ble_wait_request();
-		rc = camera_capture();
+		camera_ble_wait_request(&width, &height);
+		rc = camera_release_frame();
+		if (rc == 0) {
+			rc = camera_set_resolution(width, height);
+		}
+		if (rc == 0) {
+			k_msleep(250);
+			rc = camera_capture();
+		}
 		if (rc == 0) {
 			rc = camera_get_jpeg_length(&jpeg_length);
 		}
 		if (rc == 0) {
-			rc = camera_read_and_send_jpeg(jpeg_length);
+			rc = camera_read_and_send_jpeg(jpeg_length, width, height);
 		}
 		camera_ble_finish(rc);
 	}

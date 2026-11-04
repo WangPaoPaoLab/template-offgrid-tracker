@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Request a 640x480 JPEG from EdgeZ-Camera and save a verified BLE transfer.
+"""Trigger a JPEG capture over BLE with a selectable camera resolution.
 
 Install: python3 -m pip install -r scripts/requirements-camera-ble.txt
-Run:     python3 scripts/camera_ble_capture.py capture.jpg
+Run:     python3 scripts/camera_ble_capture.py capture.jpg --resolution 1280x720
 """
 
 import argparse
@@ -17,6 +17,10 @@ SERVICE_UUID = "a3632000-b82e-44c2-9b1d-a790675b4ac1"
 CONTROL_UUID = "a3632001-b82e-44c2-9b1d-a790675b4ac1"
 DATA_UUID = "a3632002-b82e-44c2-9b1d-a790675b4ac1"
 MAX_JPEG_SIZE = 512 * 1024
+RESOLUTIONS = (
+    "160x120", "320x240", "640x480", "1024x768", "1280x720", "1280x960",
+    "1600x1200", "1920x1080", "2304x1296",
+)
 
 
 def jpeg_dimensions(image: bytes) -> tuple[int, int]:
@@ -55,7 +59,8 @@ def jpeg_dimensions(image: bytes) -> tuple[int, int]:
 class ImageReceiver:
     """Protocol: type(u8), transfer ID(u32 LE), then type-specific payload."""
 
-    def __init__(self) -> None:
+    def __init__(self, requested_resolution: tuple[int, int] = (640, 480)) -> None:
+        self.requested_resolution = requested_resolution
         self.transfer_id: int | None = None
         self.expected_length = 0
         self.width = self.height = 0
@@ -74,7 +79,7 @@ class ImageReceiver:
             if len(packet) != 13 or self.transfer_id is not None:
                 raise ValueError("invalid or duplicate START frame")
             length, width, height = struct.unpack_from("<IHH", packet, 5)
-            if not 4 <= length <= MAX_JPEG_SIZE or (width, height) != (640, 480):
+            if not 4 <= length <= MAX_JPEG_SIZE or (width, height) != self.requested_resolution:
                 raise ValueError("invalid JPEG length or requested dimensions")
             self.transfer_id = transfer_id
             self.expected_length, self.width, self.height = length, width, height
@@ -103,7 +108,7 @@ class ImageReceiver:
         result = bytes(self.image)
         if jpeg_dimensions(result) != (self.width, self.height):
             raise ValueError("JPEG dimensions do not match advertised resolution")
-        print(f"Verified {length:,} bytes, CRC32={actual_crc:08X}, JPEG=640x480")
+        print(f"Verified {length:,} bytes, CRC32={actual_crc:08X}, JPEG={self.width}x{self.height}")
         return result
 
 
@@ -141,7 +146,8 @@ async def capture(args: argparse.Namespace) -> None:
     print(f"Connecting to {device.name} ({device.address})")
     loop = asyncio.get_running_loop()
     done: asyncio.Future[bytes] = loop.create_future()
-    receiver = ImageReceiver()
+    width, height = map(int, args.resolution.split("x"))
+    receiver = ImageReceiver((width, height))
 
     def disconnected(_client) -> None:
         if not done.done():
@@ -161,8 +167,9 @@ async def capture(args: argparse.Namespace) -> None:
                            timeout=args.scan_timeout) as client:
         await client.start_notify(DATA_UUID, notification)
         print(f"Connected; host reports ATT MTU={client.mtu_size} (firmware maximum 300)")
-        print("Requesting a new photo...")
-        await client.write_gatt_char(CONTROL_UUID, b"\x01", response=True)
+        print(f"Requesting a new {width}x{height} photo over BLE...")
+        await client.write_gatt_char(CONTROL_UUID, struct.pack("<BHH", 1, width, height),
+                                     response=True)
         try:
             image = await asyncio.wait_for(done, timeout=args.timeout)
         except asyncio.TimeoutError as exc:
@@ -176,6 +183,8 @@ def main() -> None:
     parser.add_argument("output", type=Path, nargs="?", default=Path("capture.jpg"))
     parser.add_argument("--name", default="EdgeZ-Camera")
     parser.add_argument("--address", help="specific BLE address (device UUID on macOS)")
+    parser.add_argument("--resolution", choices=RESOLUTIONS, default="640x480",
+                        help="resolution to set before triggering a fresh capture (default: 640x480)")
     parser.add_argument("--scan-timeout", type=float, default=20)
     parser.add_argument("--timeout", type=float, default=120, help="capture/transfer timeout in seconds")
     args = parser.parse_args()
