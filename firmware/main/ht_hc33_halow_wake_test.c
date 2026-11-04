@@ -8,6 +8,8 @@
 #include "driver/uart.h"
 #include "edgez_pawr_protocol.h"
 #include "edgez_pawr_twt.h"
+#include "edgez_mesh_s1g.h"
+#include "edgez_morse_diagnostics.h"
 #include "esp_timer.h"
 #include "esp_random.h"
 #include "freertos/queue.h"
@@ -66,6 +68,93 @@ static uint32_t user_wake_sequence;
 static uint32_t last_pawr_id, last_pawr_hash;
 static uint64_t last_pawr_us;
 static uint8_t last_pawr_peer[6];
+
+static void capture_mac_diagnostics(void)
+{
+    static uint8_t response[EDGEZ_MORSE_MAC_DIAGNOSTICS_CAPACITY];
+    uint32_t bytes = 0;
+    int rc = edgez_morse_read_mac_diagnostics(response, sizeof(response), &bytes);
+    ESP_LOGI(TAG, "MAC_SNAPSHOT rc=%d bytes=%lu; diagnostic command wakes transport", rc, (unsigned long)bytes);
+    if (rc != 0) return;
+    static const char hex[] = "0123456789abcdef";
+    for (uint32_t offset = 0; offset < bytes; offset += 32) {
+        char line[65];
+        uint32_t n = bytes - offset;
+        if (n > 32) n = 32;
+        for (uint32_t i = 0; i < n; ++i) {
+            line[2*i] = hex[response[offset+i] >> 4];
+            line[2*i+1] = hex[response[offset+i] & 15];
+        }
+        line[2*n] = 0;
+        ESP_LOGI(TAG, "MAC_SNAPSHOT_DATA offset=%lu hex=%s", (unsigned long)offset, line);
+    }
+}
+
+/* Explicit lab control only: native S1G timing beacons, never discovery. */
+static uint64_t sync_beacon_until;
+static bool sync_ap_mode;
+
+static void sync_beacon_stop(void)
+{
+    if (!sync_beacon_until) return;
+    int rc = wake_umac.beaconing ? edgez_umac_disable_beaconing(&wake_umac) : EDGEZ_UMAC_OK;
+    if (rc == EDGEZ_UMAC_OK && wake_umac.beacon_template_set) {
+        rc = wake_umac.driver->set_beacon_template(wake_umac.driver_ctx, wake_umac.vif_id, NULL);
+        if (rc == 0) wake_umac.beacon_template_set = false;
+    }
+    ESP_LOGI(TAG, "TWT_SYNC_BEACON STOP rc=%d", rc);
+    if (rc != EDGEZ_UMAC_OK) {
+        sync_beacon_until = esp_timer_get_time() + 1000000;
+        return;
+    }
+    sync_beacon_until = 0;
+    rc = wake_umac.driver->configure_bss(wake_umac.driver_ctx, wake_umac.vif_id,
+        1000, 1, edgez_pawr_compress_ssid((const uint8_t *)WAKE_TEST_SSID, strlen(WAKE_TEST_SSID)));
+    ESP_LOGI(TAG, "TWT_SYNC_BEACON restore_bss rc=%d", rc);
+}
+
+static void sync_beacon_start(void)
+{
+    if (sync_beacon_until) sync_beacon_stop();
+    if (sync_beacon_until) return;
+    /* S1G full beacon: 15-byte header, firmware-filled timestamp, no optional
+     * header fields. Empty TIM, ESS without privacy, 100-TU beacon interval.
+     * Sources: SDK dot11_s1g_beacon_hdr / hostapd S1G beacon construction. */
+    uint8_t frame[128] = {0x1c, 0x00};
+    memcpy(frame + 4, radio_info.mac_addr, 6);
+    size_t n = 15;
+    /* Follow Morse Linux morse_ext_s1g_beacon_ies_order: compatibility,
+     * TIM, capabilities, operation, short interval, SSID. */
+    static const uint8_t timing_ies[] = {
+        213, 8, 1, 0, 100, 0, 0, 0, 0, 0, /* Beacon compatibility, TSF high filled by firmware. */
+        5, 2, 0, 1,                    /* SDK empty S1G TIM: count and period only. */
+    };
+    memcpy(frame + n, timing_ies, sizeof(timing_ies)); n += sizeof(timing_ies);
+    memcpy(frame + n, edgez_mesh_s1g_default_capabilities_ie,
+        EDGEZ_MESH_S1G_CAPABILITIES_IE_LEN);
+    frame[n + 2 + 4] |= 0x10; /* Non-TIM support. */
+    frame[n + 2 + 8] |= 0x40; /* TWT responder support. */
+    n += EDGEZ_MESH_S1G_CAPABILITIES_IE_LEN;
+    static const uint8_t operation_ies[] = {
+        232, 6, 1, 1, 25, 25, 0xfc, 0xff, /* US 914.5 MHz, primary/operating BW 1 MHz. */
+        214, 2, 100, 0,
+    };
+    memcpy(frame + n, operation_ies, sizeof(operation_ies)); n += sizeof(operation_ies);
+    frame[n++] = 0; frame[n++] = strlen(WAKE_TEST_SSID);
+    memcpy(frame + n, WAKE_TEST_SSID, strlen(WAKE_TEST_SSID)); n += strlen(WAKE_TEST_SSID);
+    int rc = wake_umac.driver->configure_bss(wake_umac.driver_ctx, wake_umac.vif_id,
+        100, 1, edgez_pawr_compress_ssid((const uint8_t *)WAKE_TEST_SSID, strlen(WAKE_TEST_SSID)));
+    if (rc == 0) {
+        const struct edgez_rf_beacon_template beacon = {
+            .frame = frame, .frame_length = n, .mcs = 0, .bandwidth_mhz = 1,
+        };
+        rc = edgez_umac_enable_beaconing(&wake_umac, &beacon);
+    }
+    /* Arm cleanup even on error, so partially applied BSS settings are restored. */
+    sync_beacon_until = esp_timer_get_time() + 30000000;
+    ESP_LOGI(TAG, "TWT_SYNC_BEACON START rc=%d bytes=%u interval_tu=100 duration_ms=30000", rc, (unsigned)n);
+    if (rc != 0) sync_beacon_stop();
+}
 
 /* Bounded passive PM audit. Duplicate monitor copies are filtered below. */
 struct pm_audit_event {
@@ -424,9 +513,32 @@ static const struct edgez_umac_event_ops radio_events = {
     .hardware_restart_required = hardware_restart,
 };
 
+static int add_native_ap(void *ctx, const uint8_t *mac, uint16_t *vif)
+{
+    (void)ctx;
+    struct morse_cmd_req_add_interface cmd = MORSE_COMMAND_INIT(cmd,
+        MORSE_CMD_ID_ADD_INTERFACE, UINT16_MAX, .interface_type = MORSE_CMD_INTERFACE_TYPE_AP);
+    memcpy(cmd.addr.octet, mac, sizeof(cmd.addr.octet));
+    struct morse_cmd_resp_add_interface reply = {0};
+    uint32_t bytes = sizeof(reply);
+    enum mmwlan_status sdk = mmdrv_execute_command((uint8_t *)&cmd, (uint8_t *)&reply, &bytes);
+    bool valid = bytes == sizeof(reply) && reply.hdr.message_id == MORSE_CMD_ID_ADD_INTERFACE;
+    ESP_LOGI(TAG, "TWT_AP_INTERFACE sdk=%d valid=%u fw=%ld vif=%u", sdk, valid,
+        valid ? (long)(int32_t)reply.status : (long)INT32_MIN, valid ? reply.hdr.vif_id : UINT16_MAX);
+    if (!valid || sdk != MMWLAN_SUCCESS || reply.status != 0) return MMWLAN_ERROR;
+    *vif = reply.hdr.vif_id;
+    return MMWLAN_SUCCESS;
+}
+
 static esp_err_t start_radio(void)
 {
+    static struct edgez_rf_backend_ops ap_driver;
     const struct edgez_rf_backend_ops *driver = edgez_rf_driver_ops();
+    if (sync_ap_mode) {
+        ap_driver = *driver;
+        ap_driver.add_mesh_interface = add_native_ap;
+        driver = &ap_driver;
+    }
     const uint32_t compressed_ssid = edgez_pawr_compress_ssid(
         (const uint8_t *)WAKE_TEST_SSID, strlen(WAKE_TEST_SSID));
     const struct edgez_umac_config config = {
@@ -437,7 +549,7 @@ static esp_err_t start_radio(void)
             .primary_bw_mhz = 1U,
             .primary_1mhz_channel_index = 0U,
         },
-        .beacon_interval_tu = 1000U,
+        .beacon_interval_tu = sync_ap_mode ? 100U : 1000U,
         .dtim_period = 1U,
         .compressed_ssid = compressed_ssid,
         .rate_control = {
@@ -471,6 +583,26 @@ static esp_err_t start_radio(void)
     return ESP_OK;
 }
 
+/* Explicit lab switch, before a session starts. Reset HC33 to restore MESH. */
+static void switch_to_ap_test(void)
+{
+    if (twt_active || sync_beacon_until || sync_ap_mode) {
+        ESP_LOGW(TAG, "TWT_AP_MODE requires fresh HC33 boot before beacon/session start");
+        return;
+    }
+    int rc = edgez_umac_stop(&wake_umac);
+    if (rc != EDGEZ_UMAC_OK) {
+        ESP_LOGE(TAG, "TWT_AP_MODE stop failed rc=%d", rc);
+        return;
+    }
+    edgez_rf_unbind_umac();
+    twt_pending = false;
+    xQueueReset(twt_queue);
+    sync_ap_mode = true;
+    rc = start_radio();
+    ESP_LOGI(TAG, "TWT_AP_MODE start rc=%d; raw PAwR retained; reset HC33 to restore mesh", rc);
+}
+
 static void IRAM_ATTR button_isr(void *arg)
 {
     (void)arg;
@@ -490,6 +622,7 @@ static void wake_sender_task(void *arg)
         pm_audit_poll();
         twt_receive_pending();
         uint64_t now = esp_timer_get_time();
+        if (sync_beacon_until && now >= sync_beacon_until) sync_beacon_stop();
         if (twt_pending && !twt_active && now - offer_received_us > 5000000) {
             twt_pending = false;
         }
@@ -506,6 +639,10 @@ static void wake_sender_task(void *arg)
         if (command == 'p') pm_audit_start(true);
         if (command == 'o') pm_audit_start(false);
         if (command == 'P') pm_audit_stop();
+        if (command == 'b') sync_beacon_start();
+        if (command == 'B') sync_beacon_stop();
+        if (command == 'd') capture_mac_diagnostics();
+        if (command == 'a') switch_to_ap_test();
         bool button_trigger = xSemaphoreTake(button_sem, 0) == pdTRUE;
         if (button_trigger) {
             vTaskDelay(pdMS_TO_TICKS(WAKE_TEST_BUTTON_DEBOUNCE_MS));

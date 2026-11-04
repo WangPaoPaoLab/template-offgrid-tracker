@@ -1503,6 +1503,11 @@ static int sensor_pawr_exchange(uint32_t wake_interval_ms)
 			&frame_len)) {
 		return -EMSGSIZE;
 	}
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_AP_BSSID_TEST)
+	/* Public Action bootstrap uses wildcard BSSID when broadcasting; an
+	 * addressed request uses its known AP. Production stateless encoding is unchanged. */
+	memcpy(frame + 16, destination, 6);
+#endif
 
 	const struct edgez_umac_tx_request request = {
 		.token = pawr_tx_token++,

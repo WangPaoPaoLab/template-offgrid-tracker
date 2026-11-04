@@ -152,6 +152,24 @@ config OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST
       TWT. Reject stale/mismatched replies and excessive timing uncertainty.
       Shut down the radio at expiry or failure. Does not prove RF sleep.
 
+config OFFGRID_NRF54_SENSOR_TWT_BEACON_SYNC_TEST
+    bool "Allow native BSS timing seed before installing TWT (factory test)"
+    depends on OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST
+    default n
+    help
+      Wait 300 ms after installing the known peer's STA state so an opt-in
+      HC33 100-TU S1G beacon can seed firmware TSF before TWT negotiation.
+      No scan, discovery transmission, periodic calibration or LED activity.
+
+config OFFGRID_NRF54_SENSOR_TWT_AP_BSSID_TEST
+    bool "Use AP-compatible BSSID fields for factory PAwR/TWT test"
+    depends on OFFGRID_NRF54_SENSOR_TWT_BEACON_SYNC_TEST
+    default n
+    help
+      Bootstrap Public Action uses the destination or wildcard BSSID.
+      Negotiated TWT control uses the known peer BSSID. This affects only
+      the factory experiment with HC33's explicit native AP timing mode.
+
 config OFFGRID_NRF54_SENSOR_TWT_MAC_SNAPSHOT
     bool "Capture MAC protocol diagnostics once after TWT setup"
     depends on OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST

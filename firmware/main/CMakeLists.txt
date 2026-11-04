@@ -149,9 +149,10 @@ if(IDF_TARGET STREQUAL "esp32p4" AND NOT CONFIG_DAB_RAW_RF_TEST)
     set_property(TARGET ${esp_hosted_lib} PROPERTY SOURCES "${esp_hosted_sources}")
 endif()
 
-# Factory HC33 PM-frame audit uses the SDK raw command definitions only.
+# Factory HC33 audit uses SDK command definitions and RF-Morse diagnostics.
 if(CONFIG_OFFGRID_HT_HC33_HALOW_WAKE_TEST)
     target_include_directories(${COMPONENT_LIB} PRIVATE
         "${CMAKE_CURRENT_LIST_DIR}/../platforms/esp-halow/halow/components/mm-iot-sdk/framework/morselib/src"
-        "${CMAKE_CURRENT_LIST_DIR}/../platforms/esp-halow/halow/components/mm-iot-sdk/framework/morselib/include")
+        "${CMAKE_CURRENT_LIST_DIR}/../platforms/esp-halow/halow/components/mm-iot-sdk/framework/morselib/include"
+        "${CMAKE_CURRENT_LIST_DIR}/../platforms/esp-halow/halow/components/edgez-rf-morsemicro/include")
 endif()

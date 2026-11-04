@@ -5,6 +5,29 @@ static uint64_t sensor_twt_now_us(void)
     return k_ticks_to_us_floor64(k_uptime_ticks());
 }
 
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_BEACON_SYNC_TEST)
+static void sensor_twt_set_bssid(void)
+{
+    /* Linux BSS_CHANGED_BSSID -> BSSID_SET. SDK ABI 57.3 has no wrapper;
+     * retain the firmware status so unsupported commands are explicit. */
+    struct __packed {
+        struct morse_cmd_header hdr;
+        uint8_t bssid[6];
+    } cmd = MORSE_COMMAND_INIT(cmd, 0x0052, mesh_runtime.umac.vif_id);
+    memcpy(cmd.bssid, sensor_probe_peer_mac, sizeof(cmd.bssid));
+    struct { struct morse_cmd_resp resp; uint8_t extra[112]; } reply = {0};
+    uint32_t bytes = sizeof(reply);
+    enum mmwlan_status sdk = mmdrv_execute_command((uint8_t *)&cmd, (uint8_t *)&reply, &bytes);
+    bool valid = (sdk == MMWLAN_SUCCESS || sdk == MMWLAN_COMMAND_ERROR) &&
+        bytes >= sizeof(reply.resp) && bytes <= sizeof(reply) &&
+        le16toh(reply.resp.hdr.message_id) == 0x0052 &&
+        le16toh(reply.resp.hdr.vif_id) == mesh_runtime.umac.vif_id;
+    LOG_INF("PAWR_TWT BSSID_SET cmd=0x0052 peer=%02x:%02x:%02x:%02x:%02x:%02x sdk=%d valid=%u fw=%d bytes=%u",
+        cmd.bssid[0], cmd.bssid[1], cmd.bssid[2], cmd.bssid[3], cmd.bssid[4], cmd.bssid[5],
+        sdk, valid, valid ? (int32_t)le32toh(reply.resp.status) : INT32_MIN, bytes);
+}
+#endif
+
 static bool sensor_twt_ps_contract(uint16_t command_id)
 {
     struct morse_cmd_req_li_sleep li = MORSE_COMMAND_INIT(li,
@@ -47,6 +70,9 @@ static bool sensor_twt_send_to(const struct edgez_pawr_twt *msg, const uint8_t p
     if (!edgez_pawr_encode_action_frame(frame, sizeof(frame), pawr_sequence_number++,
             mesh_runtime.radio_info.mac_addr, peer,
             packet, packet_len, &frame_len)) return false;
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_AP_BSSID_TEST)
+    memcpy(frame + 16, peer, 6);
+#endif
     const struct edgez_umac_tx_request tx = {
         .token = ++pawr_tx_token, .frame = frame, .frame_length = frame_len,
         .frame_type = EDGEZ_UMAC_TX_MANAGEMENT, .tid = 8, .mcs = 0,
@@ -249,6 +275,9 @@ static bool sensor_twt_pawr_test(void)
     LOG_INF("PAWR_TWT STA_BSS beacon_tu=%u dtim=0 cssid=0 sdk=%d",
         mesh_runtime.config.beacon_interval_tu, bss_status);
     if (bss_status != 0) goto done;
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_BEACON_SYNC_TEST)
+    sensor_twt_set_bssid();
+#endif
     /* The SDK programs LI_SLEEP at interface creation, then non-TIM after
      * association. LI_SLEEP counts configured beacon intervals; this does
      * not change the separately negotiated 2.000 s TWT agreement. */
@@ -257,6 +286,10 @@ static bool sensor_twt_pawr_test(void)
         if (!sensor_probe_sta_state(state)) goto done;
         if (state == 3 && !sensor_twt_ps_contract(MORSE_CMD_ID_GET_SET_GENERIC_PARAM)) goto done;
     }
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_BEACON_SYNC_TEST)
+    LOG_INF("PAWR_TWT native beacon sync opportunity wait_ms=300; known peer, no discovery");
+    k_msleep(300);
+#endif
     /* Match mmdrv_set_chip_power_save_enabled(): delegate dynamic PS to
      * firmware. Linux uses PS_NULLFUNC_STACK when offload is disabled;
      * this stateless host does not implement that PM-null state machine. */
@@ -287,9 +320,11 @@ static bool sensor_twt_pawr_test(void)
         break;
     }
     if (!accepted) { LOG_ERR("PAWR_TWT accept timeout or timing uncertainty"); goto done; }
-    /* Announced implicit flow 0, exponent 5: 62500 << 5 = 2 seconds. */
-    if (!sensor_probe_twt_at(MORSE_CMD_ID_TWT_AGREEMENT_VALIDATE, 0x1420, offer.target_tsf)) goto done;
-    installed = sensor_probe_twt_at(MORSE_CMD_ID_TWT_AGREEMENT_INSTALL, 0x1420, offer.target_tsf);
+    /* Match SDK requester/SUGGEST installation for a negotiated explicit TSF:
+     * request=1, setup=SUGGEST(1), implicit=1, announced flow 0, exponent=5.
+     * Period remains 62500 << 5 = 2 seconds. */
+    if (!sensor_probe_twt_at(MORSE_CMD_ID_TWT_AGREEMENT_VALIDATE, 0x1423, offer.target_tsf)) goto done;
+    installed = sensor_probe_twt_at(MORSE_CMD_ID_TWT_AGREEMENT_INSTALL, 0x1423, offer.target_tsf);
     if (!installed) goto done;
     offer.kind = EDGEZ_PAWR_TWT_COMMIT;
     bool ready = false;
