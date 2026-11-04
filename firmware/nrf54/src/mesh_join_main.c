@@ -50,6 +50,15 @@ struct sensor_twt_event {
 	uint64_t received_us;
 };
 K_MSGQ_DEFINE(sensor_twt_queue, sizeof(struct sensor_twt_event), 8, 8);
+K_SEM_DEFINE(sensor_twt_tx_done, 0, 1);
+static atomic_t sensor_twt_tx_armed;
+static atomic_t sensor_twt_tx_failed;
+static uintptr_t sensor_twt_tx_token;
+/* Guarded by sensor_pawr_lock; valid only for the current PAwR exchange. */
+static struct sensor_twt_event sensor_twt_seed;
+static bool sensor_twt_seed_valid;
+static bool sensor_probe_scan_receive(bool enabled);
+static bool sensor_probe_monitor(uint16_t *vif_id, bool enabled);
 #endif
 #include "edgez_sensor_settings.h"
 #include "edgez_mesh_sae_provider.h"
@@ -898,6 +907,24 @@ static int join_ignore_unsupported(void *ctx,
 		struct sensor_twt_event event = { .received_us = k_ticks_to_us_floor64(k_uptime_ticks()) };
 		size_t base;
 		if (edgez_pawr_twt_unwrap(action.payload, action.payload_length, &base, &event.msg)) {
+            uint32_t hash, ssid;
+            if (event.msg.kind == EDGEZ_PAWR_TWT_HELLO &&
+                edgez_pawr_decode_response(action.payload, base, &hash, &ssid) &&
+                ssid == mesh_runtime.config.compressed_ssid &&
+                !(action.source[0] & 1U) && memcmp(action.source, "\0\0\0\0\0\0", 6) &&
+                !memcmp(action.destination, mesh_runtime.radio_info.mac_addr, 6)) {
+                memcpy(event.peer, action.source, 6);
+                k_spinlock_key_t key = k_spin_lock(&sensor_pawr_lock);
+                bool matched = sensor_pawr_waiting && hash == sensor_pawr_expected_hash;
+                if (matched) {
+                    sensor_twt_seed = event;
+                    sensor_twt_seed_valid = true;
+                    sensor_pawr_waiting = false;
+                }
+                k_spin_unlock(&sensor_pawr_lock, key);
+                if (matched) k_sem_give(&sensor_pawr_response_sem);
+                return EDGEZ_UMAC_OK;
+            }
 			if (edgez_pawr_decode_request(action.payload, base, &request) &&
 			    request.type == EDGEZ_PAWR_REQUEST_MESH_PACKET &&
 			    request.compressed_ssid == mesh_runtime.config.compressed_ssid &&
@@ -928,6 +955,7 @@ static int join_ignore_unsupported(void *ctx,
 			    (memcmp(action.destination, broadcast, 6) == 0 ||
 			     memcmp(action.destination, mesh_runtime.radio_info.mac_addr, 6) == 0) &&
 			    edgez_pawr_twt_decode(request.payload, request.payload_length, &event.msg) &&
+			    event.msg.kind != EDGEZ_PAWR_TWT_HELLO &&
 			    event.msg.kind != EDGEZ_PAWR_TWT_PROBE && event.msg.kind != EDGEZ_PAWR_TWT_HIT) {
 				memcpy(event.peer, action.source, 6);
 				(void)k_msgq_put(&sensor_twt_queue, &event, K_NO_WAIT);
@@ -1049,6 +1077,13 @@ static void join_tx_status(void *ctx,
 			   const struct edgez_umac_tx_status *status)
 {
 	ARG_UNUSED(ctx);
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST)
+	if (atomic_get(&sensor_twt_tx_armed) && status->token == sensor_twt_tx_token) {
+		atomic_set(&sensor_twt_tx_failed,
+			(status->status_flags & EDGEZ_RF_TX_STATUS_FAILED) != 0U);
+		k_sem_give(&sensor_twt_tx_done);
+	}
+#endif
 	tx_status_count++;
 	LOG_INF("mesh TX status token=%" PRIuPTR " len=%u attempts=%u flags=0x%08" PRIx32,
 		status->token, (unsigned)status->frame_length,
@@ -1268,6 +1303,11 @@ static bool same_radio_profile(const struct edgez_halow_profile *a,
 
 static uint32_t sensor_update_interval_ms(void)
 {
+	/* The fixed wake experiment uses its configured test cadence even when
+	 * older provisioned sampling settings are present in flash. */
+	if (sensor_factory_wake_mode) {
+		return CONFIG_OFFGRID_NRF54_SENSOR_BOOTSTRAP_INTERVAL_SECONDS * 1000U;
+	}
 	return edgez_config_should_autostart() ?
 		sensor_settings.value.sampling_interval_ms :
 		CONFIG_OFFGRID_NRF54_SENSOR_BOOTSTRAP_INTERVAL_SECONDS * 1000U;
@@ -1402,7 +1442,7 @@ static int sensor_retune_bootstrap_channel(void)
 	return 0;
 }
 
-static int sensor_pawr_send_once(uint32_t wake_interval_ms)
+static int sensor_pawr_exchange(uint32_t wake_interval_ms)
 {
 	static const uint8_t broadcast[6] = {
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff
@@ -1501,6 +1541,9 @@ static int sensor_pawr_send_once(uint32_t wake_interval_ms)
 		response_timeout_ms);
 	if (k_sem_take(&sensor_pawr_response_sem,
 			       K_MSEC(response_timeout_ms)) == 0) {
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST)
+        if (sensor_factory_wake_mode) return 0;
+#endif
 		/* The acknowledgement only confirms that a companion received this
 		 * request.  A cached encrypted profile is returned in a separate PAwR
 		 * mesh-packet action frame, so an unprovisioned sensor must keep RX up
@@ -1517,6 +1560,37 @@ static int sensor_pawr_send_once(uint32_t wake_interval_ms)
 	k_spin_unlock(&sensor_pawr_lock, key);
 	LOG_WRN("sensor PAwR request=%u acknowledgement timeout", request_id);
 	return -ETIMEDOUT;
+}
+
+
+static int sensor_pawr_send_once(uint32_t wake_interval_ms)
+{
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_PAWR_TWT_TEST)
+    if (sensor_factory_wake_mode) {
+        k_spinlock_key_t key = k_spin_lock(&sensor_pawr_lock);
+        sensor_twt_seed_valid = false;
+        k_spin_unlock(&sensor_pawr_lock, key);
+        /* Unassociated STA needs broad RX for this existing PAwR ACK window.
+         * No discovery packets, channel sweep or additional listening period. */
+        uint16_t monitor = UINT16_MAX;
+        bool monitoring = sensor_probe_monitor(&monitor, true);
+        bool scanning = monitoring && sensor_probe_scan_receive(true);
+        int rc = -EIO;
+        if (scanning && mesh_runtime.umac.driver->set_channel(mesh_runtime.umac.driver_ctx,
+                &mesh_runtime.config.channel) == 0)
+            rc = sensor_pawr_exchange(wake_interval_ms);
+        bool stopped = !scanning || sensor_probe_scan_receive(false);
+        bool removed = !monitoring || sensor_probe_monitor(&monitor, false);
+        if (!stopped || !removed || rc != 0) {
+            key = k_spin_lock(&sensor_pawr_lock);
+            sensor_twt_seed_valid = false;
+            k_spin_unlock(&sensor_pawr_lock, key);
+            return rc ? rc : -EIO;
+        }
+        return 0;
+    }
+#endif
+    return sensor_pawr_exchange(wake_interval_ms);
 }
 
 #if defined(CONFIG_OFFGRID_NRF54_ROLE_SENSOR)
@@ -3141,14 +3215,8 @@ static struct {
 
 static void sensor_begin_cycle(uint32_t now)
 {
-#if DT_NODE_HAS_STATUS(EDGEZ_SENSOR_LED_NODE, okay)
-	/* In the fixed HC33 wake experiment the LED belongs exclusively to the
-	 * remote-wake indication. This prevents the ordinary sensor report timer
-	 * from looking like a successful HC33 wake. */
-	if (!sensor_factory_wake_mode) {
-		sensor_led_set_awake(true);
-	}
-#endif
+	/* Periodic sensor activity never lights the LED. Only a received remote
+	 * wake request may start the LED indication, in every sensor profile. */
 	sensor_power.cycle_started_ms = now;
 	sensor_power.phase = SENSOR_POWER_READY;
 }
@@ -3246,7 +3314,12 @@ static void sensor_finish_cycle(uint32_t now)
 	/* A zero-touch wake may spend several seconds sweeping all regulatory
 	 * 1 MHz channels. Its configured interval is sleep time after that sweep,
 	 * not a period measured from the beginning of the radio activity. */
-	if (!edgez_config_should_autostart()) {
+	if (sensor_factory_wake_mode) {
+		/* Keep retry starts one interval apart; discovery time is included.
+		 * After a long active session, allow a full interval before retrying. */
+		sensor_power.next_wake_ms = elapsed_ms < interval_ms ?
+			sensor_power.cycle_started_ms + interval_ms : now + interval_ms;
+	} else if (!edgez_config_should_autostart()) {
 		sensor_power.next_wake_ms = now + interval_ms;
 	} else {
 		sensor_power.next_wake_ms = elapsed_ms < interval_ms ?
@@ -3556,6 +3629,15 @@ int main(void)
 	} else if (sensor_role && sensor_load_factory_bootstrap() != 0) {
 		LOG_ERR("factory discovery country/channel unavailable or invalid");
 	}
+#if DT_NODE_HAS_STATUS(EDGEZ_SENSOR_LED_NODE, okay)
+	if (sensor_role && sensor_factory_wake_mode && sensor_led_ready) {
+		LOG_INF("LED boot self-test on P2.05 for 5000 ms; periodic LED disabled");
+		sensor_led_set_awake(true);
+		k_msleep(5000);
+		sensor_led_set_awake(false);
+		LOG_INF("LED boot self-test complete; HC33 remote wake indication enabled");
+	}
+#endif
 	int sensor_rc = edgez_battery_init();
 	if (sensor_rc != 0) {
 		LOG_WRN("battery sensing unavailable rc=%d", sensor_rc);

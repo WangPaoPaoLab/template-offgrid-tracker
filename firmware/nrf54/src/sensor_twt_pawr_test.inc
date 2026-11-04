@@ -29,7 +29,7 @@ static bool sensor_twt_ps_contract(uint16_t command_id)
     return valid && sdk == MMWLAN_SUCCESS && le32toh(reply.resp.status) == 0;
 }
 
-static bool sensor_twt_send(const struct edgez_pawr_twt *msg)
+static bool sensor_twt_send_to(const struct edgez_pawr_twt *msg, const uint8_t peer[6])
 {
     uint8_t payload[EDGEZ_PAWR_TWT_LENGTH];
     uint8_t packet[EDGEZ_PAWR_HEADER_LENGTH + EDGEZ_PAWR_TWT_TRAILER_LENGTH];
@@ -45,14 +45,35 @@ static bool sensor_twt_send(const struct edgez_pawr_twt *msg)
             ++pawr_request_id, 0, mesh_runtime.config.compressed_ssid,
             payload, sizeof(payload), &packet_len)) return false;
     if (!edgez_pawr_encode_action_frame(frame, sizeof(frame), pawr_sequence_number++,
-            mesh_runtime.radio_info.mac_addr, sensor_probe_peer_mac,
+            mesh_runtime.radio_info.mac_addr, peer,
             packet, packet_len, &frame_len)) return false;
     const struct edgez_umac_tx_request tx = {
         .token = ++pawr_tx_token, .frame = frame, .frame_length = frame_len,
         .frame_type = EDGEZ_UMAC_TX_MANAGEMENT, .tid = 8, .mcs = 0,
         .attempts = 1, .bandwidth_mhz = 1, .no_ack = true, .immediate_status = true,
     };
-    return edgez_umac_transmit(&mesh_runtime.umac, &tx) == EDGEZ_UMAC_OK;
+    bool feedback = msg->kind == EDGEZ_PAWR_TWT_HIT;
+    if (feedback) {
+        k_sem_reset(&sensor_twt_tx_done);
+        atomic_clear(&sensor_twt_tx_failed);
+        sensor_twt_tx_token = tx.token;
+        atomic_set(&sensor_twt_tx_armed, 1);
+    }
+    bool submitted = edgez_umac_transmit(&mesh_runtime.umac, &tx) == EDGEZ_UMAC_OK;
+    if (!feedback) return submitted;
+    /* Submission is asynchronous. Reconfigure PS only once this ACK has
+     * completed, never from the driver callback or while its TX is queued. */
+    bool completed = submitted && k_sem_take(&sensor_twt_tx_done, K_MSEC(200)) == 0;
+    atomic_clear(&sensor_twt_tx_armed);
+    bool failed = atomic_get(&sensor_twt_tx_failed);
+    LOG_INF("PAWR_TWT ACK_TX token=%u submitted=%u completed=%u failed=%u",
+        (unsigned)tx.token, submitted, completed, failed);
+    return completed && !failed;
+}
+
+static bool sensor_twt_send(const struct edgez_pawr_twt *msg)
+{
+    return sensor_twt_send_to(msg, sensor_probe_peer_mac);
 }
 
 static bool sensor_twt_wait(const struct edgez_pawr_twt *offer, uint8_t kind,
@@ -74,8 +95,7 @@ static bool sensor_twt_pawr_test(void)
 {
     /* Re-enter on the normal sensor retry cycle after a disconnect. A
      * one-shot boot latch would permanently lose USER wake after expiry. */
-    uint16_t monitor = UINT16_MAX;
-    bool monitor_on = false, scanning = false, installed = false;
+    bool installed = false;
     struct sensor_twt_event event;
     struct edgez_pawr_twt offer = {0};
     unsigned inside = 0, outside = 0;
@@ -83,35 +103,25 @@ static bool sensor_twt_pawr_test(void)
     uint64_t led_until = 0;
     uint64_t last_probe_us = 0;
     bool host_released = false;
+    k_spinlock_key_t key = k_spin_lock(&sensor_pawr_lock);
+    bool seeded = sensor_twt_seed_valid;
+    if (seeded) event = sensor_twt_seed;
+    sensor_twt_seed_valid = false;
+    k_spin_unlock(&sensor_pawr_lock, key);
+    if (!seeded) {
+        LOG_INF("PAWR_TWT no session in PAwR ACK; defer until next sensor cycle");
+        return false;
+    }
+    memcpy(sensor_probe_peer_mac, event.peer, 6);
+    atomic_set(&sensor_probe_peer_seen, 1);
+    offer = (struct edgez_pawr_twt) {
+        .kind = EDGEZ_PAWR_TWT_OFFER, .session = event.msg.session,
+        .interval_us = 2000000, .duration_us = 50176, .lease_ms = 0,
+    };
+    LOG_INF("PAWR_TWT session=%u from PAwR ACK; no discovery", offer.session);
     if (mmdrv_set_wake_enabled(true) != MMWLAN_SUCCESS ||
         !sensor_probe_long_sleep(false) || !sensor_probe_config_ps(false, false)) goto done;
     k_msgq_purge(&sensor_twt_queue);
-    monitor_on = sensor_probe_monitor(&monitor, true);
-    if (!monitor_on) goto done;
-    scanning = sensor_probe_scan_receive(true);
-    if (!scanning || mesh_runtime.umac.driver->set_channel(mesh_runtime.umac.driver_ctx,
-                                                          &mesh_runtime.config.channel) != 0) goto done;
-    LOG_INF("PAWR_TWT discovery START timeout_ms=15000");
-    int64_t discovery_end = k_uptime_get() + 15000;
-    bool discovered = false;
-    while (k_uptime_get() < discovery_end) {
-        if (k_msgq_get(&sensor_twt_queue, &event, K_MSEC(100)) == 0 &&
-            event.msg.kind == EDGEZ_PAWR_TWT_HELLO) {
-            memcpy(sensor_probe_peer_mac, event.peer, 6);
-            atomic_set(&sensor_probe_peer_seen, 1);
-            offer = (struct edgez_pawr_twt) {
-                .kind = EDGEZ_PAWR_TWT_OFFER, .session = event.msg.session,
-                .interval_us = 2000000, .duration_us = 50176, .lease_ms = 0,
-            };
-            discovered = true;
-            break;
-        }
-    }
-    if (!discovered) { LOG_ERR("PAWR_TWT discovery timeout"); goto done; }
-    if (!sensor_probe_scan_receive(false)) goto done;
-    scanning = false;
-    if (!sensor_probe_monitor(&monitor, false)) goto done;
-    monitor_on = false;
     /* The SDK programs LI_SLEEP at interface creation, then non-TIM after
      * association. Two beacon intervals are 2.048 s with our 1000-TU BSS;
      * this does not change the separately negotiated 2.000 s TWT agreement. */
@@ -184,11 +194,6 @@ static bool sensor_twt_pawr_test(void)
         uint64_t deadline = led_until && led_until < expires ? led_until : expires;
         if (!host_released && release_at < deadline) deadline = release_at;
         if (k_msgq_get(&sensor_twt_queue, &event, (deadline == UINT64_MAX ? K_FOREVER : K_USEC(deadline - now))) != 0) continue;
-        if (!memcmp(event.peer, sensor_probe_peer_mac, 6) &&
-            event.msg.kind == EDGEZ_PAWR_TWT_HELLO && event.msg.session != offer.session) {
-            LOG_INF("PAWR_TWT peer restarted; renegotiating on sensor retry cycle");
-            break;
-        }
         if (memcmp(event.peer, sensor_probe_peer_mac, 6) ||
             !edgez_pawr_twt_same_schedule(&offer, &event.msg) ||
             event.msg.round_trip_us != offer.round_trip_us) continue;
@@ -229,12 +234,16 @@ static bool sensor_twt_pawr_test(void)
                     feedback.kind = EDGEZ_PAWR_TWT_HIT;
                     feedback.phase_error_us = error;
                     feedback.processing_us = (uint32_t)processing;
-                    (void)sensor_twt_send(&feedback);
+                    if (!sensor_twt_send(&feedback)) goto done;
                 }
 
             }
         }
-        if (host_released && mmdrv_set_wake_enabled(false) != MMWLAN_SUCCESS) goto done;
+        if (host_released) {
+            enum mmwlan_status released = mmdrv_set_wake_enabled(false);
+            LOG_INF("PAWR_TWT POST_TX host_release_sdk=%d", released);
+            if (released != MMWLAN_SUCCESS) goto done;
+        }
         /* Timing feedback piggybacks on the USER request hash ACK. Current is measured externally;
          * no GPIO, BUSY or packet counters infer the RF sleep state. */
     }
@@ -243,8 +252,6 @@ static bool sensor_twt_pawr_test(void)
     sensor_led_set_awake(false);
     (void)mmdrv_set_wake_enabled(true);
     sensor_halow_sleep_allowed = false;
-    if (scanning) (void)sensor_probe_scan_receive(false);
-    if (monitor_on) (void)sensor_probe_monitor(&monitor, false);
     if (installed) (void)sensor_probe_twt_at(MORSE_CMD_ID_TWT_AGREEMENT_REMOVE, 0x1420, 0);
     if (offer.target_tsf) { offer.kind = EDGEZ_PAWR_TWT_CANCEL; (void)sensor_twt_send(&offer); k_msleep(20); }
     atomic_clear(&sensor_remote_wake_pending);
