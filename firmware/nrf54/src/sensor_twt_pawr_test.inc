@@ -125,8 +125,45 @@ static uint8_t sensor_twt_mac_snapshot[EDGEZ_MORSE_MAC_DIAGNOSTICS_CAPACITY] __a
 static volatile uint32_t sensor_twt_mac_snapshot_length;
 static volatile int32_t sensor_twt_mac_snapshot_status = -1;
 
+static const struct gpio_dt_spec sensor_twt_busy_pin =
+    GPIO_DT_SPEC_GET(DT_NODELABEL(morse_wifi), busy_gpios);
+static const struct gpio_dt_spec sensor_twt_wake_pin =
+    GPIO_DT_SPEC_GET(DT_NODELABEL(morse_wifi), wakeup_gpios);
+static struct gpio_callback sensor_twt_busy_callback;
+static atomic_t sensor_twt_busy_edges;
+static bool sensor_twt_busy_observer_ready;
+
+static void sensor_twt_observe_busy(const struct device *port,
+                                  struct gpio_callback *cb, uint32_t pins)
+{
+    ARG_UNUSED(port);
+    ARG_UNUSED(cb);
+    if (pins & BIT(sensor_twt_busy_pin.pin)) atomic_inc(&sensor_twt_busy_edges);
+}
+
+static void sensor_twt_busy_observer_start(void)
+{
+    /* Observe the driver's existing BUSY callback only. Do not configure a
+     * pin, enable an interrupt, poll, or generate a driver wake request. */
+    if (sensor_twt_busy_observer_ready) return;
+    gpio_init_callback(&sensor_twt_busy_callback, sensor_twt_observe_busy,
+                      BIT(sensor_twt_busy_pin.pin));
+    int rc = gpio_add_callback(sensor_twt_busy_pin.port, &sensor_twt_busy_callback);
+    sensor_twt_busy_observer_ready = rc == 0;
+    LOG_INF("PAWR_TWT BUSY_OBSERVER register=%d pin=%u; existing interrupt only",
+        rc, sensor_twt_busy_pin.pin);
+}
+
+static void sensor_twt_log_busy(const char *stage)
+{
+    LOG_INF("PAWR_TWT BUSY_OBSERVER stage=%s edges=%u busy=%d wake=%d",
+        stage, (unsigned)atomic_get(&sensor_twt_busy_edges),
+        gpio_pin_get_dt(&sensor_twt_busy_pin), gpio_pin_get_dt(&sensor_twt_wake_pin));
+}
+
 static void sensor_twt_capture_mac(void)
 {
+    sensor_twt_log_busy("before-snapshot");
     uint32_t bytes = 0;
     int rc = edgez_morse_read_mac_diagnostics(sensor_twt_mac_snapshot,
         sizeof(sensor_twt_mac_snapshot), &bytes);
@@ -134,6 +171,7 @@ static void sensor_twt_capture_mac(void)
     sensor_twt_mac_snapshot_status = rc;
     LOG_INF("PAWR_TWT MAC_SNAPSHOT sdk=%d bytes=%u; one-shot protocol diagnostic, not a power measurement",
         rc, bytes);
+    sensor_twt_log_busy("after-snapshot");
 }
 #endif
 
@@ -263,6 +301,10 @@ static bool sensor_twt_pawr_test(void)
         .interval_us = 2000000, .duration_us = 50176, .lease_ms = 0,
     };
     LOG_INF("PAWR_TWT session=%u from PAwR ACK; no discovery", offer.session);
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_MAC_SNAPSHOT)
+    sensor_twt_busy_observer_start();
+    sensor_twt_log_busy("setup");
+#endif
     if (mmdrv_set_wake_enabled(true) != MMWLAN_SUCCESS ||
         !sensor_probe_long_sleep(false) || !sensor_probe_config_ps(false, false)) goto done;
     k_msgq_purge(&sensor_twt_queue);
@@ -368,6 +410,9 @@ static bool sensor_twt_pawr_test(void)
             if (mmdrv_set_wake_enabled(false) != MMWLAN_SUCCESS) goto done;
             sensor_halow_sleep_allowed = host_released = true;
             LOG_INF("PAWR_TWT host wake released; subsequent calibration runs only after RX");
+#if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_MAC_SNAPSHOT)
+            sensor_twt_log_busy("host-release");
+#endif
         }
         uint64_t deadline = led_until && led_until < expires ? led_until : expires;
 #if defined(CONFIG_OFFGRID_NRF54_SENSOR_TWT_MAC_SNAPSHOT)

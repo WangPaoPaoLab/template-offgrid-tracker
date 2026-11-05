@@ -237,10 +237,31 @@ sensor image with:
 pio run -e edgez-nrf54l15-fgh200m-sensor -t upload
 ```
 
+These environments use the packaged nRF54-capable OpenOCD at 1 MHz, verify
+the programmed image, and reset/run only after verification succeeds. They
+do not automatically recover or mass-erase a locked target.
+
+For an RTT-enabled image, start an OpenOCD server using the exact flashed ELF:
+
+```sh
+python scripts/nrf54_openocd.py serve --elf .pio/build/edgez-nrf54l15-fgh200m-sensor-debug/firmware.elf
+```
+
+RTT channel 0 is available on `localhost:9090`, with TCL on port 6666 and GDB
+on port 3333. `serve` does not reset unless `--reset` is specified. Stop OpenOCD
+and disconnect the debug probe before measuring current externally.
+
 Pass `--upload-port <CMSIS_DAP_SERIAL>` when more than one CMSIS-DAP probe is
-connected. The companion and factory-partition provisioning flows continue to
-use J-Link; their Commander files live under `scripts/jlink/`, and the factory
-script expands `factory_partition.jlink.in` before programming.
+connected. To program an existing factory record through OpenOCD:
+
+```sh
+python scripts/nrf54_openocd.py flash /path/to/factory-partition.bin --address 0x165000
+```
+
+Use `--serial <CMSIS_DAP_SERIAL>` with this helper to select a probe. The factory
+builder's `--build-only` option also produces an image for this command. The
+companion and legacy factory provisioning script retain J-Link support; their
+Commander files remain under `scripts/jlink/`.
 
 See the [narrated low-power sensor demonstration](../docs/halow-pawr-low-power-sensor.md)
 for the mobile sensor view and measured wake/transmit waveform.
