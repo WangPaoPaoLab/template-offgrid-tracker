@@ -1,6 +1,6 @@
 # KEEPTEEN × EdgeZ.ai · App UI 交接
 
-更新：2026-11-16。这是供郝先生重构 App 的可操作网页规格板，生产 App 仍由工程师实现。
+更新：2026-11-16。这是供jason hao重构 App 的可操作网页规格板，生产 App 仍由工程师实现。
 
 ## 打开网页
 
@@ -21,7 +21,7 @@
 
 ## 工程师从这里开始
 
-1. [交付总入口](../KEEPTEEN_UI_HANDOFF.md)与[当前用户需求 R01–R40](../ui-handoff/reference/00_USER_REQUIREMENTS.md)。
+1. [交付总入口](../KEEPTEEN_UI_HANDOFF.md)与[当前用户需求 R01–R41](../ui-handoff/reference/00_USER_REQUIREMENTS.md)。
 2. [后端与设备能力清单](../ui-handoff/reference/backend_alignment/BACKEND_CAPABILITIES.md)、[网页接口交接](UI_HANDOFF.md)、[适配契约](ADAPTER_CONTRACT.md)。
 3. [地图与围栏专项交接](../ui-handoff/reference/backend_alignment/MAP_GEOFENCE_IMPLEMENTATION_HANDOFF.md)。
 4. [完整工程素材说明](../ui-handoff/README.md)、[透明素材预览](../ui-handoff/ASSET_PREVIEW.html)、[729条素材清单](../ui-handoff/ASSET_MANIFEST.json)。

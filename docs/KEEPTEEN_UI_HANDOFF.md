@@ -1,4 +1,4 @@
-# 郝先生：App UI 重构交接入口
+# jason hao：App UI 重构交接入口
 
 更新：2026-11-16。当前交接基于本fork的 `ui/prototype-handoff` 分支，更新上游 [PR #1](https://github.com/edgez-ai/template-offgrid-tracker/pull/1)。
 
@@ -9,7 +9,7 @@
 | 网页使用说明和当前截图 | [ui-prototype/README.md](ui-prototype/README.md) |
 | 默认用户界面 | 下载分支后打开 `ui-prototype/index.html` |
 | 工程评审界面 | 下载分支后打开 `ui-prototype/review.html` |
-| 最新需求及已否定方案 R01–R40 | [需求基线](ui-handoff/reference/00_USER_REQUIREMENTS.md) |
+| 最新需求及已否定方案 R01–R41 | [需求基线](ui-handoff/reference/00_USER_REQUIREMENTS.md) |
 | 原有后端和设备实际能力 | [能力清单](ui-handoff/reference/backend_alignment/BACKEND_CAPABILITIES.md) |
 | 前端到真实App的对齐点 | [接口交接](ui-prototype/UI_HANDOFF.md)、[适配契约](ui-prototype/ADAPTER_CONTRACT.md) |
 | 地图与电子围栏 | [专项实施交接](ui-handoff/reference/backend_alignment/MAP_GEOFENCE_IMPLEMENTATION_HANDOFF.md) |

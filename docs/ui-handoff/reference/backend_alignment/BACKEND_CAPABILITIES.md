@@ -2,7 +2,7 @@
 
 核查日期：2026-11-13。
 
-本清单以郝先生仓库 `edgez-ai/template-offgrid-tracker` 的 `b0b35eb1d98b1ea3cdc7fcb1a3ef39a17cfc9501` 为源码基线，对应本次 UI PR 的父提交。SDK 核查的是本机已安装、与该基线依赖版本一致的 `@edgez/react-native-sdk@0.1.35`。原目录 `01_Software_Source` 的提交为 `fb8886b`，还有本地 UI 实验，不能把两份工程的能力混为一谈。
+本清单以jason hao仓库 `edgez-ai/template-offgrid-tracker` 的 `b0b35eb1d98b1ea3cdc7fcb1a3ef39a17cfc9501` 为源码基线，对应本次 UI PR 的父提交。SDK 核查的是本机已安装、与该基线依赖版本一致的 `@edgez/react-native-sdk@0.1.35`。原目录 `01_Software_Source` 的提交为 `fb8886b`，还有本地 UI 实验，不能把两份工程的能力混为一谈。
 
 这是源码与配置盘点，未登录生产云端、调用真实业务 API、烧录或连接硬件。下文“已有代码”表示找到实现或调用依据，不表示已通过端到端验收。外部 Appwrite Devices 服务端实现不在此仓库中，响应结构和权限仍须同服务提供方联调确认。
 

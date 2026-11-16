@@ -23,7 +23,7 @@
 
 - 真实BLE/SoftAP与产品描述握手、硬件下发确认、系统推送、图片传输/已读/密码服务、真实地图下载和可靠围栏执行依然需按能力表接入与真机验收。网页适配器为demo。
 - 原生源码已有nRF54/ESP32 BLE与H7608 SoftAP扫描，网页目前仅三条BLE fixture；SoftAP连接分支未展示。低功耗项圈sensor不提供BLE，节点走HaLow网关。
-- 简介是依据官网改写的展示稿，并非两家官方中文原文。用户最新纠正与来源见reference/00_USER_REQUIREMENTS.md R01–R40。
+- 简介是依据官网改写的展示稿，并非两家官方中文原文。用户最新纠正与来源见reference/00_USER_REQUIREMENTS.md R01–R41。
 
 ## 复核入口
 
