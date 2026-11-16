@@ -1,0 +1,2317 @@
+[
+  {
+    "id": "m000",
+    "en": "Ranch gateway",
+    "zh": "牧场网关"
+  },
+  {
+    "id": "m001",
+    "en": "Chat",
+    "zh": "聊天"
+  },
+  {
+    "id": "m002",
+    "en": "Not available",
+    "zh": "暂无信息"
+  },
+  {
+    "id": "m003",
+    "en": "{p0}s ago",
+    "zh": "{p0} 秒前"
+  },
+  {
+    "id": "m004",
+    "en": "{p0}m ago",
+    "zh": "{p0} 分钟前"
+  },
+  {
+    "id": "m005",
+    "en": "{p0}h ago",
+    "zh": "{p0} 小时前"
+  },
+  {
+    "id": "m006",
+    "en": "Updates paused",
+    "zh": "状态待更新"
+  },
+  {
+    "id": "m007",
+    "en": "Recently seen",
+    "zh": "近期有上报"
+  },
+  {
+    "id": "m008",
+    "en": "No recent reports",
+    "zh": "长时间未上报"
+  },
+  {
+    "id": "m009",
+    "en": "Connected",
+    "zh": "已连接"
+  },
+  {
+    "id": "m010",
+    "en": "Disconnected",
+    "zh": "未连接"
+  },
+  {
+    "id": "m011",
+    "en": "Unable to save. Changes may be lost when you close this page.",
+    "zh": "暂时无法保存，关闭页面后可能丢失更改。"
+  },
+  {
+    "id": "m012",
+    "en": "Back",
+    "zh": "返回"
+  },
+  {
+    "id": "m013",
+    "en": "Connection details",
+    "zh": "点击查看连接信息"
+  },
+  {
+    "id": "m014",
+    "en": "Tap to connect",
+    "zh": "点击连接设备"
+  },
+  {
+    "id": "m015",
+    "en": "Collars",
+    "zh": "项圈"
+  },
+  {
+    "id": "m016",
+    "en": "Water valve",
+    "zh": "水阀"
+  },
+  {
+    "id": "m017",
+    "en": "Coming soon",
+    "zh": "即将开放"
+  },
+  {
+    "id": "m018",
+    "en": "Camera",
+    "zh": "摄像头"
+  },
+  {
+    "id": "m019",
+    "en": "Devices",
+    "zh": "设备"
+  },
+  {
+    "id": "m020",
+    "en": "Add device",
+    "zh": "添加设备"
+  },
+  {
+    "id": "m021",
+    "en": "Your connected world, simplified.",
+    "zh": "万物互联，至简随行。"
+  },
+  {
+    "id": "m022",
+    "en": "My products",
+    "zh": "我的产品"
+  },
+  {
+    "id": "m023",
+    "en": "Add a product",
+    "zh": "添加产品"
+  },
+  {
+    "id": "m024",
+    "en": "Collar",
+    "zh": "项圈"
+  },
+  {
+    "id": "m025",
+    "en": "Collar",
+    "zh": "项圈"
+  },
+  {
+    "id": "m026",
+    "en": "Collar",
+    "zh": "项圈"
+  },
+  {
+    "id": "m027",
+    "en": "Battery voltage",
+    "zh": "电池电压"
+  },
+  {
+    "id": "m028",
+    "en": "Signal strength",
+    "zh": "信号强度"
+  },
+  {
+    "id": "m029",
+    "en": "Last report",
+    "zh": "最近上报"
+  },
+  {
+    "id": "m030",
+    "en": "No fix",
+    "zh": "尚未定位"
+  },
+  {
+    "id": "m031",
+    "en": "Location available",
+    "zh": "有定位数据"
+  },
+  {
+    "id": "m032",
+    "en": "Last known location",
+    "zh": "最后已知位置"
+  },
+  {
+    "id": "m033",
+    "en": "Total collars",
+    "zh": "项圈总数"
+  },
+  {
+    "id": "m034",
+    "en": "Low voltage",
+    "zh": "低电压"
+  },
+  {
+    "id": "m035",
+    "en": "Collars",
+    "zh": "项圈"
+  },
+  {
+    "id": "m036",
+    "en": "Map",
+    "zh": "地图"
+  },
+  {
+    "id": "m037",
+    "en": "Fences",
+    "zh": "围栏"
+  },
+  {
+    "id": "m038",
+    "en": "Search name or serial",
+    "zh": "搜索名称或设备编号"
+  },
+  {
+    "id": "m039",
+    "en": "Search collars",
+    "zh": "搜索项圈"
+  },
+  {
+    "id": "m040",
+    "en": "Filter collars",
+    "zh": "筛选项圈"
+  },
+  {
+    "id": "m041",
+    "en": "All collars",
+    "zh": "全部项圈"
+  },
+  {
+    "id": "m042",
+    "en": "No reports",
+    "zh": "未上报"
+  },
+  {
+    "id": "m043",
+    "en": "No collars found",
+    "zh": "没有找到项圈"
+  },
+  {
+    "id": "m044",
+    "en": "Waiting for collars",
+    "zh": "等待项圈加入"
+  },
+  {
+    "id": "m045",
+    "en": "Try another name or number.",
+    "zh": "试试其他名称或编号。"
+  },
+  {
+    "id": "m046",
+    "en": "Gateway connected. Search for collars or wait for updates from added collars.",
+    "zh": "网关已连接。搜索附近项圈，或等待已添加项圈上报。"
+  },
+  {
+    "id": "m047",
+    "en": "Connect a gateway to manage collars.",
+    "zh": "连接网关，查看并管理项圈。"
+  },
+  {
+    "id": "m048",
+    "en": "Connect gateway",
+    "zh": "连接牧场网关"
+  },
+  {
+    "id": "m049",
+    "en": "No collar selected",
+    "zh": "未选择项圈"
+  },
+  {
+    "id": "m050",
+    "en": "Node ",
+    "zh": "节点 "
+  },
+  {
+    "id": "m051",
+    "en": "Gateway",
+    "zh": "所属网关"
+  },
+  {
+    "id": "m052",
+    "en": "As reported by node",
+    "zh": "按节点上报显示"
+  },
+  {
+    "id": "m053",
+    "en": "Last observation",
+    "zh": "最近观测值"
+  },
+  {
+    "id": "m054",
+    "en": "Location",
+    "zh": "定位信息"
+  },
+  {
+    "id": "m055",
+    "en": "No location received",
+    "zh": "尚未收到定位"
+  },
+  {
+    "id": "m056",
+    "en": "Location sampled: ",
+    "zh": "位置采集："
+  },
+  {
+    "id": "m057",
+    "en": "No default position is substituted.",
+    "zh": "不会用默认坐标代替缺失位置。"
+  },
+  {
+    "id": "m058",
+    "en": "View on map",
+    "zh": "在地图上查看"
+  },
+  {
+    "id": "m059",
+    "en": "Rename",
+    "zh": "修改显示名称"
+  },
+  {
+    "id": "m060",
+    "en": "This device does not declare a buzzer or battery percentage capability.",
+    "zh": "本设备未声明响铃和电池百分比能力，因此不显示对应操作或估算值。"
+  },
+  {
+    "id": "m061",
+    "en": "Collar map",
+    "zh": "项圈地图"
+  },
+  {
+    "id": "m062",
+    "en": "East pasture",
+    "zh": "东侧牧场"
+  },
+  {
+    "id": "m063",
+    "en": "Creek",
+    "zh": "溪流"
+  },
+  {
+    "id": "m064",
+    "en": "Map preview",
+    "zh": "地图预览"
+  },
+  {
+    "id": "m065",
+    "en": "Recent location",
+    "zh": "近期定位"
+  },
+  {
+    "id": "m066",
+    "en": "Older position",
+    "zh": "旧位置"
+  },
+  {
+    "id": "m067",
+    "en": "collars located",
+    "zh": "个已定位项圈"
+  },
+  {
+    "id": "m068",
+    "en": "Drag to pan, use + / − to zoom, select a node to inspect.",
+    "zh": "拖动地图移动，使用 + / − 缩放，点击编号查看节点。"
+  },
+  {
+    "id": "m069",
+    "en": "Select a collar",
+    "zh": "选择一个项圈"
+  },
+  {
+    "id": "m070",
+    "en": "View status and last location.",
+    "zh": "查看状态与最近位置。"
+  },
+  {
+    "id": "m071",
+    "en": "Collars without a location remain in the list.",
+    "zh": "未定位的项圈仍可在列表中查看。"
+  },
+  {
+    "id": "m072",
+    "en": "New fence",
+    "zh": "新建电子围栏"
+  },
+  {
+    "id": "m073",
+    "en": "Enabled",
+    "zh": "已启用"
+  },
+  {
+    "id": "m074",
+    "en": "Disabled",
+    "zh": "已停用"
+  },
+  {
+    "id": "m075",
+    "en": "Edit fence",
+    "zh": "编辑围栏"
+  },
+  {
+    "id": "m076",
+    "en": "Applies to {p0} collars",
+    "zh": "适用 {p0} 个项圈"
+  },
+  {
+    "id": "m077",
+    "en": "Applies to all collars",
+    "zh": "适用全部项圈"
+  },
+  {
+    "id": "m078",
+    "en": "Enter alert",
+    "zh": "进入提醒"
+  },
+  {
+    "id": "m079",
+    "en": "Exit alert",
+    "zh": "离开提醒"
+  },
+  {
+    "id": "m080",
+    "en": "Area alerts",
+    "zh": "区域提醒"
+  },
+  {
+    "id": "m081",
+    "en": "Outside area",
+    "zh": "区域外"
+  },
+  {
+    "id": "m082",
+    "en": "Inside area",
+    "zh": "区域内"
+  },
+  {
+    "id": "m083",
+    "en": "Location updated",
+    "zh": "定位更新于"
+  },
+  {
+    "id": "m084",
+    "en": "Acknowledged",
+    "zh": "已确认"
+  },
+  {
+    "id": "m085",
+    "en": "Acknowledge",
+    "zh": "确认提醒"
+  },
+  {
+    "id": "m086",
+    "en": "No area alerts",
+    "zh": "暂无区域提醒"
+  },
+  {
+    "id": "m087",
+    "en": "Enabled rules use valid location reports.",
+    "zh": "收到有效位置时，按已启用规则检查。"
+  },
+  {
+    "id": "m088",
+    "en": "Waiting for connection and valid positions.",
+    "zh": "等待连接与有效位置上报，当前无法判断。"
+  },
+  {
+    "id": "m089",
+    "en": "No normal status is inferred from disabled rules, missing fixes or stale positions.",
+    "zh": "停用、未定位或数据过期的节点，不判断为围栏内正常。"
+  },
+  {
+    "id": "m090",
+    "en": "Circle",
+    "zh": "圆形"
+  },
+  {
+    "id": "m091",
+    "en": "Oval",
+    "zh": "椭圆"
+  },
+  {
+    "id": "m092",
+    "en": "Rectangle",
+    "zh": "矩形"
+  },
+  {
+    "id": "m093",
+    "en": "Polygon",
+    "zh": "多边形"
+  },
+  {
+    "id": "m094",
+    "en": "Public hall",
+    "zh": "公共大厅"
+  },
+  {
+    "id": "m095",
+    "en": "Emergency",
+    "zh": "应急协作"
+  },
+  {
+    "id": "m096",
+    "en": "Ranch",
+    "zh": "牧场协作"
+  },
+  {
+    "id": "m097",
+    "en": "Device exchange",
+    "zh": "设备交流"
+  },
+  {
+    "id": "m098",
+    "en": "Reserve",
+    "zh": "备用信道"
+  },
+  {
+    "id": "m099",
+    "en": "Sending",
+    "zh": "发送中"
+  },
+  {
+    "id": "m100",
+    "en": "Sent",
+    "zh": "已发出"
+  },
+  {
+    "id": "m101",
+    "en": "Delivered",
+    "zh": "已送达"
+  },
+  {
+    "id": "m102",
+    "en": "Failed",
+    "zh": "发送失败"
+  },
+  {
+    "id": "m103",
+    "en": "Retry {p0}/3",
+    "zh": "重试 {p0}/3"
+  },
+  {
+    "id": "m104",
+    "en": "Conversation info",
+    "zh": "会话信息"
+  },
+  {
+    "id": "m105",
+    "en": "Public broadcast · no all-member receipt",
+    "zh": "公共广播 · 不提供全员送达确认"
+  },
+  {
+    "id": "m106",
+    "en": "Direct message",
+    "zh": "私聊"
+  },
+  {
+    "id": "m107",
+    "en": "Peer unavailable. History is still available.",
+    "zh": "对端暂不可达。可查看历史消息。"
+  },
+  {
+    "id": "m108",
+    "en": "Connect the chat device to send messages.",
+    "zh": "聊天设备未连接，连接后可发送消息。"
+  },
+  {
+    "id": "m109",
+    "en": "Retry",
+    "zh": "点击重试"
+  },
+  {
+    "id": "m110",
+    "en": "No messages yet. Say hello.",
+    "zh": "还没有消息，发送一句问候吧。"
+  },
+  {
+    "id": "m111",
+    "en": "Roger that",
+    "zh": "收到"
+  },
+  {
+    "id": "m112",
+    "en": "Meet at the rally point",
+    "zh": "请到集合点"
+  },
+  {
+    "id": "m113",
+    "en": "Need assistance",
+    "zh": "需要协助"
+  },
+  {
+    "id": "m114",
+    "en": "Message…",
+    "zh": "输入消息…"
+  },
+  {
+    "id": "m115",
+    "en": "Message",
+    "zh": "消息内容"
+  },
+  {
+    "id": "m116",
+    "en": "Send",
+    "zh": "发送"
+  },
+  {
+    "id": "m117",
+    "en": "Public broadcast channel",
+    "zh": "公共广播信道"
+  },
+  {
+    "id": "m118",
+    "en": "Recent beacon",
+    "zh": "近期收到信标"
+  },
+  {
+    "id": "m119",
+    "en": "Last seen 18m ago",
+    "zh": "最后发现于 18 分钟前"
+  },
+  {
+    "id": "m120",
+    "en": "Offline chat",
+    "zh": "离线通信"
+  },
+  {
+    "id": "m121",
+    "en": "2 peers reachable",
+    "zh": "2 位队友可达"
+  },
+  {
+    "id": "m122",
+    "en": "Waiting for people",
+    "zh": "等待队友"
+  },
+  {
+    "id": "m123",
+    "en": "Channels",
+    "zh": "公共信道"
+  },
+  {
+    "id": "m124",
+    "en": "People",
+    "zh": "队友"
+  },
+  {
+    "id": "m125",
+    "en": "No peers discovered",
+    "zh": "尚未发现队友"
+  },
+  {
+    "id": "m126",
+    "en": "People on the same network appear here.",
+    "zh": "加入同一网络后，可在这里看到队友。"
+  },
+  {
+    "id": "m127",
+    "en": "Messages travel through your chat device without the Internet.",
+    "zh": "消息通过聊天设备传输，不依赖公网。"
+  },
+  {
+    "id": "m128",
+    "en": "Settings",
+    "zh": "设置"
+  },
+  {
+    "id": "m129",
+    "en": "Sign in",
+    "zh": "登录账号"
+  },
+  {
+    "id": "m130",
+    "en": "Sign in to manage cloud devices",
+    "zh": "登录后管理云端设备"
+  },
+  {
+    "id": "m131",
+    "en": "Identity & connectivity",
+    "zh": "身份与连接"
+  },
+  {
+    "id": "m132",
+    "en": "Identity",
+    "zh": "身份"
+  },
+  {
+    "id": "m133",
+    "en": "HaLow",
+    "zh": "HaLow"
+  },
+  {
+    "id": "m134",
+    "en": "Settings for each device",
+    "zh": "分别设置每台设备"
+  },
+  {
+    "id": "m135",
+    "en": "App & support",
+    "zh": "应用与支持"
+  },
+  {
+    "id": "m136",
+    "en": "Offline maps",
+    "zh": "离线地图"
+  },
+  {
+    "id": "m137",
+    "en": "Maps and local data",
+    "zh": "地图下载与数据管理"
+  },
+  {
+    "id": "m138",
+    "en": "Language",
+    "zh": "语言"
+  },
+  {
+    "id": "m139",
+    "en": "Appearance",
+    "zh": "外观"
+  },
+  {
+    "id": "m140",
+    "en": "Dark",
+    "zh": "深色"
+  },
+  {
+    "id": "m141",
+    "en": "Light",
+    "zh": "浅色"
+  },
+  {
+    "id": "m142",
+    "en": "About",
+    "zh": "关于"
+  },
+  {
+    "id": "m143",
+    "en": "Version & brand",
+    "zh": "版本与品牌信息"
+  },
+  {
+    "id": "m144",
+    "en": "Connect devices and chat offline without signing in.",
+    "zh": "无需登录，也能连接设备和使用离线聊天。"
+  },
+  {
+    "id": "m145",
+    "en": "Choose a device to configure.",
+    "zh": "选择要设置的设备。"
+  },
+  {
+    "id": "m146",
+    "en": "Applied",
+    "zh": "已生效"
+  },
+  {
+    "id": "m147",
+    "en": "Saved, pending application",
+    "zh": "已保存，待应用"
+  },
+  {
+    "id": "m148",
+    "en": "Applying and checking",
+    "zh": "正在应用并核对"
+  },
+  {
+    "id": "m149",
+    "en": "Not applied; previous settings retained",
+    "zh": "未能应用，原设置保持不变"
+  },
+  {
+    "id": "m150",
+    "en": "Target: ",
+    "zh": "配置目标："
+  },
+  {
+    "id": "m151",
+    "en": "Country / region",
+    "zh": "国家 / 地区"
+  },
+  {
+    "id": "m152",
+    "en": "Channel bandwidth",
+    "zh": "信道带宽"
+  },
+  {
+    "id": "m153",
+    "en": "Channel & center frequency",
+    "zh": "信道与中心频率"
+  },
+  {
+    "id": "m154",
+    "en": "Network name",
+    "zh": "网络名称"
+  },
+  {
+    "id": "m155",
+    "en": "Network passphrase",
+    "zh": "网络密码"
+  },
+  {
+    "id": "m156",
+    "en": "Show passphrase",
+    "zh": "显示密码"
+  },
+  {
+    "id": "m157",
+    "en": "Use the same network name and password to join the same network.",
+    "zh": "使用相同的网络名称和密码，才能加入同一网络。"
+  },
+  {
+    "id": "m158",
+    "en": "Save configuration",
+    "zh": "保存配置"
+  },
+  {
+    "id": "m159",
+    "en": "Apply to device",
+    "zh": "应用到设备"
+  },
+  {
+    "id": "m160",
+    "en": "Use device’s current configuration",
+    "zh": "恢复为设备当前配置"
+  },
+  {
+    "id": "m161",
+    "en": "Network changes may briefly disconnect this device. Check the connection after confirmation.",
+    "zh": "修改网络设置可能暂时断开连接，请在设备确认后检查连接。"
+  },
+  {
+    "id": "m162",
+    "en": "Radius (m)",
+    "zh": "半径（米）"
+  },
+  {
+    "id": "m163",
+    "en": "East–west radius (m)",
+    "zh": "东西半轴（米）"
+  },
+  {
+    "id": "m164",
+    "en": "North–south radius (m)",
+    "zh": "南北半轴（米）"
+  },
+  {
+    "id": "m165",
+    "en": "Width (m)",
+    "zh": "宽度（米）"
+  },
+  {
+    "id": "m166",
+    "en": "Height (m)",
+    "zh": "高度（米）"
+  },
+  {
+    "id": "m167",
+    "en": "Fence name",
+    "zh": "围栏名称"
+  },
+  {
+    "id": "m168",
+    "en": "Area shape",
+    "zh": "区域形状"
+  },
+  {
+    "id": "m169",
+    "en": "Tap the map to add at least 3 vertices.",
+    "zh": "点击地图依次添加顶点，至少 3 个。"
+  },
+  {
+    "id": "m170",
+    "en": "Tap the map to set the center, or enter coordinates.",
+    "zh": "点击地图设置中心，也可以输入坐标。"
+  },
+  {
+    "id": "m171",
+    "en": "Undo vertex ({p0})",
+    "zh": "撤销顶点（{p0}）"
+  },
+  {
+    "id": "m172",
+    "en": "Center latitude",
+    "zh": "中心纬度"
+  },
+  {
+    "id": "m173",
+    "en": "Center longitude",
+    "zh": "中心经度"
+  },
+  {
+    "id": "m174",
+    "en": "Rotation (degrees)",
+    "zh": "旋转角度"
+  },
+  {
+    "id": "m175",
+    "en": "Applies to collars",
+    "zh": "适用项圈"
+  },
+  {
+    "id": "m176",
+    "en": "Select collars",
+    "zh": "选择项圈"
+  },
+  {
+    "id": "m177",
+    "en": "Notify on entry",
+    "zh": "进入区域提醒"
+  },
+  {
+    "id": "m178",
+    "en": "Notify on exit",
+    "zh": "离开区域提醒"
+  },
+  {
+    "id": "m179",
+    "en": "Enable fence",
+    "zh": "启用此围栏"
+  },
+  {
+    "id": "m180",
+    "en": "Save fence",
+    "zh": "保存围栏"
+  },
+  {
+    "id": "m181",
+    "en": "Delete fence",
+    "zh": "删除围栏"
+  },
+  {
+    "id": "m182",
+    "en": "Electronic fence",
+    "zh": "电子围栏"
+  },
+  {
+    "id": "m183",
+    "en": "HaLow settings",
+    "zh": "HaLow 设置"
+  },
+  {
+    "id": "m184",
+    "en": "Control channel ready. View device and network settings.",
+    "zh": "控制通道就绪，可查看设备与网络配置。"
+  },
+  {
+    "id": "m185",
+    "en": "Power on the device and bring it near your phone.",
+    "zh": "打开设备电源并靠近手机，然后开始连接。"
+  },
+  {
+    "id": "m186",
+    "en": "Connect",
+    "zh": "开始连接"
+  },
+  {
+    "id": "m187",
+    "en": "Network settings",
+    "zh": "查看网络配置"
+  },
+  {
+    "id": "m188",
+    "en": "Collar gateway",
+    "zh": "项圈网关"
+  },
+  {
+    "id": "m189",
+    "en": "Connect a gateway to discover its nodes",
+    "zh": "连接网关后发现下属节点"
+  },
+  {
+    "id": "m190",
+    "en": "Connect your chat device",
+    "zh": "连接聊天设备"
+  },
+  {
+    "id": "m191",
+    "en": "Water valves and cameras will be available later.",
+    "zh": "水阀与摄像头将在后续版本开放。"
+  },
+  {
+    "id": "m192",
+    "en": "Name / callsign",
+    "zh": "昵称 / 呼号"
+  },
+  {
+    "id": "m193",
+    "en": "Communication identity ID",
+    "zh": "通信身份 ID"
+  },
+  {
+    "id": "m194",
+    "en": "Node address",
+    "zh": "节点地址"
+  },
+  {
+    "id": "m195",
+    "en": "Public key",
+    "zh": "公钥"
+  },
+  {
+    "id": "m196",
+    "en": "Save name",
+    "zh": "保存昵称"
+  },
+  {
+    "id": "m197",
+    "en": "Account",
+    "zh": "账号管理"
+  },
+  {
+    "id": "m198",
+    "en": "Signed in",
+    "zh": "已登录"
+  },
+  {
+    "id": "m199",
+    "en": "Sign out",
+    "zh": "退出账号"
+  },
+  {
+    "id": "m200",
+    "en": "Email",
+    "zh": "邮箱"
+  },
+  {
+    "id": "m201",
+    "en": "Email code",
+    "zh": "邮箱验证码"
+  },
+  {
+    "id": "m202",
+    "en": "Verify and sign in",
+    "zh": "验证并登录"
+  },
+  {
+    "id": "m203",
+    "en": "Request code",
+    "zh": "获取验证码"
+  },
+  {
+    "id": "m204",
+    "en": "Offline features are available without signing in.",
+    "zh": "离线功能可在未登录时使用。"
+  },
+  {
+    "id": "m205",
+    "en": "Broadcasts cannot confirm delivery to every listener.",
+    "zh": "公共广播无法确认所有收听者均已收到。"
+  },
+  {
+    "id": "m206",
+    "en": "Delivered means the other device received the message.",
+    "zh": "“已送达”表示对方设备已收到消息。"
+  },
+  {
+    "id": "m207",
+    "en": "Collar name",
+    "zh": "项圈名称"
+  },
+  {
+    "id": "m208",
+    "en": "Display name",
+    "zh": "显示名称"
+  },
+  {
+    "id": "m209",
+    "en": "Save",
+    "zh": "保存"
+  },
+  {
+    "id": "m210",
+    "en": "No offline map packs",
+    "zh": "尚无离线地图包"
+  },
+  {
+    "id": "m211",
+    "en": "The illustrative map is not an offline map pack. Real downloads require the app’s native map interface.",
+    "zh": "当前示意底图不占用离线地图存储。真实地图下载需要 App 原生地图接口。"
+  },
+  {
+    "id": "m212",
+    "en": "Interaction specification v1",
+    "zh": "交互规格演示 v1"
+  },
+  {
+    "id": "m213",
+    "en": "Gateway control: ",
+    "zh": "网关控制通道："
+  },
+  {
+    "id": "m214",
+    "en": "Chat device connection: ",
+    "zh": "聊天设备连接："
+  },
+  {
+    "id": "m215",
+    "en": "Delete fence?",
+    "zh": "删除围栏？"
+  },
+  {
+    "id": "m216",
+    "en": "This removes the fence and its rule, keeping node data.",
+    "zh": "此操作会移除该围栏及其规则，不影响节点数据。"
+  },
+  {
+    "id": "m217",
+    "en": "Close",
+    "zh": "关闭"
+  },
+  {
+    "id": "m218",
+    "en": "Main navigation",
+    "zh": "主导航"
+  },
+  {
+    "id": "m219",
+    "en": "Devices",
+    "zh": "设备"
+  },
+  {
+    "id": "m220",
+    "en": "Light mode",
+    "zh": "切换浅色"
+  },
+  {
+    "id": "m221",
+    "en": "OLED dark mode",
+    "zh": "切换 OLED 黑"
+  },
+  {
+    "id": "m222",
+    "en": "Configuration fields are incomplete",
+    "zh": "配置字段不完整"
+  },
+  {
+    "id": "m223",
+    "en": "Select a supported channel for this region",
+    "zh": "请选择该地区支持的信道"
+  },
+  {
+    "id": "m224",
+    "en": "Network name must be 1–32 bytes",
+    "zh": "网络名称需要 1–32 字节"
+  },
+  {
+    "id": "m225",
+    "en": "Passphrase must be 8–63 bytes, or empty",
+    "zh": "密码需要 8–63 字节，或留空"
+  },
+  {
+    "id": "m226",
+    "en": "Enter a name of 1–128 characters",
+    "zh": "请输入 1–128 字符的名称"
+  },
+  {
+    "id": "m227",
+    "en": "Enter valid coordinates",
+    "zh": "请输入有效经纬度"
+  },
+  {
+    "id": "m228",
+    "en": "Enable at least one alert",
+    "zh": "至少开启一种提醒"
+  },
+  {
+    "id": "m229",
+    "en": "Choose a valid shape",
+    "zh": "请选择有效形状"
+  },
+  {
+    "id": "m230",
+    "en": "Dimensions must be 10–100000 metres",
+    "zh": "尺寸需要在 10–100000 米之间"
+  },
+  {
+    "id": "m231",
+    "en": "Rotation must be between -180 and 180",
+    "zh": "旋转角度需要在 -180 到 180 之间"
+  },
+  {
+    "id": "m232",
+    "en": "Use 3–64 unique vertices without collinearity or self-intersection",
+    "zh": "需要 3–64 个不重复、不共线且不自交的顶点"
+  },
+  {
+    "id": "m233",
+    "en": "Select at least one collar.",
+    "zh": "请选择至少一个项圈。"
+  },
+  {
+    "id": "m234",
+    "en": "Area exceeds the interface limit; use fewer vertices",
+    "zh": "区域数据超过接口容量，请减少顶点"
+  },
+  {
+    "id": "m235",
+    "en": "Saved. Connect the device to apply.",
+    "zh": "已保存，连接设备后可应用。"
+  },
+  {
+    "id": "m236",
+    "en": "Demo: read-back matches",
+    "zh": "演示：配置读回一致"
+  },
+  {
+    "id": "m237",
+    "en": "Demo: failed; previous configuration retained",
+    "zh": "演示：应用失败，保留原配置"
+  },
+  {
+    "id": "m238",
+    "en": "Messages are limited to 240 bytes",
+    "zh": "消息最多 240 字节"
+  },
+  {
+    "id": "m239",
+    "en": "Details are not available yet.",
+    "zh": "详情暂未开放"
+  },
+  {
+    "id": "m240",
+    "en": "Connecting…",
+    "zh": "正在连接…"
+  },
+  {
+    "id": "m241",
+    "en": "Device connected",
+    "zh": "设备已连接"
+  },
+  {
+    "id": "m242",
+    "en": "Signed out. Local records retained.",
+    "zh": "已退出账号，本地记录保留"
+  },
+  {
+    "id": "m243",
+    "en": "Configuration saved",
+    "zh": "配置已保存"
+  },
+  {
+    "id": "m244",
+    "en": "Fence and rule saved",
+    "zh": "围栏与规则已保存"
+  },
+  {
+    "id": "m245",
+    "en": "Name cannot be empty",
+    "zh": "名称不能为空"
+  },
+  {
+    "id": "m246",
+    "en": "Enter a valid email",
+    "zh": "请输入有效邮箱"
+  },
+  {
+    "id": "m247",
+    "en": "Code sent. Check your email.",
+    "zh": "验证码已发送，请查看邮箱。"
+  },
+  {
+    "id": "m248",
+    "en": "Incorrect code. Try again.",
+    "zh": "验证码不正确，请重试。"
+  },
+  {
+    "id": "m249",
+    "en": "Signed in",
+    "zh": "登录成功"
+  },
+  {
+    "id": "m250",
+    "en": "Maximum 64 vertices",
+    "zh": "最多 64 个顶点"
+  },
+  {
+    "id": "m251",
+    "en": "Demo scenario changed",
+    "zh": "已切换演示场景"
+  },
+  {
+    "id": "m252",
+    "en": "Language options",
+    "zh": "语言选择"
+  },
+  {
+    "id": "m253",
+    "en": "Choose your interface language",
+    "zh": "选择界面语言"
+  },
+  {
+    "id": "m254",
+    "en": "Offline leader",
+    "zh": "离线领队"
+  },
+  {
+    "id": "m255",
+    "en": "Ranch manager",
+    "zh": "牧场管理员"
+  },
+  {
+    "id": "m256",
+    "en": "West patrol",
+    "zh": "西区巡护员"
+  },
+  {
+    "id": "m257",
+    "en": "Camp teammate",
+    "zh": "营地队友"
+  },
+  {
+    "id": "m258",
+    "en": "Near the west fence. Returning to the rally point.",
+    "zh": "我在西侧围栏附近，准备返回集合点。"
+  },
+  {
+    "id": "m259",
+    "en": "Pasture A",
+    "zh": "牧区 A"
+  },
+  {
+    "id": "m260",
+    "en": "Zoom in",
+    "zh": "放大"
+  },
+  {
+    "id": "m261",
+    "en": "Zoom out",
+    "zh": "缩小"
+  },
+  {
+    "id": "m262",
+    "en": "Reset map",
+    "zh": "重置地图"
+  },
+  {
+    "id": "m263",
+    "en": "Simulation",
+    "zh": "状态模拟"
+  },
+  {
+    "id": "m264",
+    "en": "1: Not connected",
+    "zh": "1：未连主机"
+  },
+  {
+    "id": "m265",
+    "en": "2: Controller ready",
+    "zh": "2：主机就绪"
+  },
+  {
+    "id": "m266",
+    "en": "3: Active network",
+    "zh": "3：完整组网"
+  },
+  {
+    "id": "m267",
+    "en": "Pair a product",
+    "zh": "产品配对向导"
+  },
+  {
+    "id": "m268",
+    "en": "Interactive presentation · simulated data",
+    "zh": "交互展示板 · 模拟数据"
+  },
+  {
+    "id": "m269",
+    "en": "Collars: gateway, nodes, map and fences. Chat: messages and media. Valve and camera: entry cards only.",
+    "zh": "项圈：网关、节点、地图与围栏。聊天：文字、图片与语音。水阀与摄像头仅展示入口。"
+  },
+  {
+    "id": "m270",
+    "en": "Direct message outcome",
+    "zh": "私聊发送结果"
+  },
+  {
+    "id": "m271",
+    "en": "Simulate peer confirmation",
+    "zh": "模拟对端确认"
+  },
+  {
+    "id": "m272",
+    "en": "Simulate timeout and retries",
+    "zh": "模拟超时与重试"
+  },
+  {
+    "id": "m273",
+    "en": "Configuration outcome",
+    "zh": "配置应用结果"
+  },
+  {
+    "id": "m274",
+    "en": "Simulate matching read-back",
+    "zh": "模拟读回一致"
+  },
+  {
+    "id": "m275",
+    "en": "Simulate application failure",
+    "zh": "模拟下发失败"
+  },
+  {
+    "id": "m276",
+    "en": "Account verification, device application and receipts are simulations. No hardware or cloud is connected. Demo code: 123456. Retry timing is accelerated.",
+    "zh": "账号验证、设备配置与回执均为模拟，未连接硬件或云服务。演示验证码：123456。重试时间已加速。"
+  },
+  {
+    "id": "m277",
+    "en": "The map is illustrative. Fence checks use sample positions. See the handoff for execution and synchronization requirements.",
+    "zh": "地图为示意底图，围栏依据样本位置判断。执行位置与同步要求见交接说明。"
+  },
+  {
+    "id": "m278",
+    "en": "Read the UI and interface handoff",
+    "zh": "查看页面与接口交接说明"
+  },
+  {
+    "id": "m279",
+    "en": "KEEPTEEN · Device hub",
+    "zh": "KEEPTEEN · 设备中心"
+  },
+  {
+    "id": "m280",
+    "en": "Read",
+    "zh": "已读"
+  },
+  {
+    "id": "m281",
+    "en": "Image",
+    "zh": "图片"
+  },
+  {
+    "id": "m282",
+    "en": "Voice",
+    "zh": "语音"
+  },
+  {
+    "id": "m283",
+    "en": "Choose image",
+    "zh": "选择图片"
+  },
+  {
+    "id": "m284",
+    "en": "Voice message",
+    "zh": "语音消息"
+  },
+  {
+    "id": "m285",
+    "en": "Start recording",
+    "zh": "开始录音"
+  },
+  {
+    "id": "m286",
+    "en": "Stop recording",
+    "zh": "结束录音"
+  },
+  {
+    "id": "m287",
+    "en": "Send image",
+    "zh": "发送图片"
+  },
+  {
+    "id": "m288",
+    "en": "Send voice",
+    "zh": "发送语音"
+  },
+  {
+    "id": "m289",
+    "en": "Cancel",
+    "zh": "取消"
+  },
+  {
+    "id": "m290",
+    "en": "Add a caption (optional)",
+    "zh": "添加说明（可选）"
+  },
+  {
+    "id": "m291",
+    "en": "File must be 8 MB or smaller.",
+    "zh": "文件不能超过 8 MB。"
+  },
+  {
+    "id": "m292",
+    "en": "Choose a JPEG, PNG, WebP or GIF image.",
+    "zh": "请选择 JPEG、PNG、WebP 或 GIF 图片。"
+  },
+  {
+    "id": "m293",
+    "en": "Recording unavailable. Choose an audio file.",
+    "zh": "暂时无法录音，请选择音频文件。"
+  },
+  {
+    "id": "m294",
+    "en": "Microphone permission denied.",
+    "zh": "未获得麦克风权限。"
+  },
+  {
+    "id": "m295",
+    "en": "Choose audio file",
+    "zh": "选择音频文件"
+  },
+  {
+    "id": "m296",
+    "en": "Recording…",
+    "zh": "正在录音…"
+  },
+  {
+    "id": "m297",
+    "en": "Audio preview",
+    "zh": "语音试听"
+  },
+  {
+    "id": "m298",
+    "en": "Password login",
+    "zh": "密码登录"
+  },
+  {
+    "id": "m299",
+    "en": "Code login",
+    "zh": "验证码登录"
+  },
+  {
+    "id": "m300",
+    "en": "Password",
+    "zh": "密码"
+  },
+  {
+    "id": "m301",
+    "en": "Show password",
+    "zh": "显示密码"
+  },
+  {
+    "id": "m302",
+    "en": "Email or password incorrect",
+    "zh": "邮箱或密码不正确"
+  },
+  {
+    "id": "m303",
+    "en": "Demo password: Demo@123456",
+    "zh": "演示密码：Demo@123456"
+  },
+  {
+    "id": "m304",
+    "en": "Simulate a read receipt",
+    "zh": "模拟已读回执"
+  },
+  {
+    "id": "m305",
+    "en": "Unable to read this file.",
+    "zh": "无法读取此文件。"
+  },
+  {
+    "id": "m306",
+    "en": "Maximum recording length: 60 seconds.",
+    "zh": "录音最长 60 秒。"
+  },
+  {
+    "id": "m307",
+    "en": "Image preview",
+    "zh": "图片预览"
+  },
+  {
+    "id": "m308",
+    "en": "Duration: {p0}s",
+    "zh": "时长：{p0} 秒"
+  },
+  {
+    "id": "m309",
+    "en": "Images and voice are local files in this demo. Delivery and read receipts are simulated.",
+    "zh": "本演示的图片和语音为本机文件，送达与已读回执均为模拟。"
+  },
+  {
+    "id": "m310",
+    "en": "Enter a password.",
+    "zh": "请输入密码。"
+  },
+  {
+    "id": "m311",
+    "en": "Recording failed. Try again or choose an audio file.",
+    "zh": "录音失败，请重试或选择音频文件。"
+  },
+  {
+    "id": "m312",
+    "en": "Searching for nearby devices",
+    "zh": "正在搜索附近设备"
+  },
+  {
+    "id": "m313",
+    "en": "Keep the device powered on and near your phone.",
+    "zh": "请保持设备开机并靠近手机。"
+  },
+  {
+    "id": "m314",
+    "en": "No nearby devices found",
+    "zh": "未发现附近设备"
+  },
+  {
+    "id": "m315",
+    "en": "Turn on Bluetooth in system settings, then search again.",
+    "zh": "请在系统设置中开启蓝牙后重新搜索。"
+  },
+  {
+    "id": "m316",
+    "en": "Allow Bluetooth access in system settings, then search again.",
+    "zh": "请在系统设置中允许蓝牙权限后重新搜索。"
+  },
+  {
+    "id": "m317",
+    "en": "Search again",
+    "zh": "重新搜索"
+  },
+  {
+    "id": "m318",
+    "en": "Nearby devices",
+    "zh": "附近设备"
+  },
+  {
+    "id": "m319",
+    "en": "Device search outcome",
+    "zh": "设备搜索结果"
+  },
+  {
+    "id": "m320",
+    "en": "Devices found",
+    "zh": "发现设备"
+  },
+  {
+    "id": "m321",
+    "en": "No devices",
+    "zh": "没有设备"
+  },
+  {
+    "id": "m322",
+    "en": "Bluetooth off",
+    "zh": "蓝牙未开启"
+  },
+  {
+    "id": "m323",
+    "en": "Permission denied",
+    "zh": "权限不足"
+  },
+  {
+    "id": "m324",
+    "en": "Device ID",
+    "zh": "设备编号"
+  },
+  {
+    "id": "m325",
+    "en": "Select a discovered device to connect.",
+    "zh": "选择已发现的设备进行连接。"
+  },
+  {
+    "id": "m326",
+    "en": "Capability baseline",
+    "zh": "现有能力基线"
+  },
+  {
+    "id": "m327",
+    "en": "Full feature proposal",
+    "zh": "完整功能提案"
+  },
+  {
+    "id": "m328",
+    "en": "Feature scope",
+    "zh": "功能范围"
+  },
+  {
+    "id": "m329",
+    "en": "Connection and data scenario",
+    "zh": "连接与数据场景"
+  },
+  {
+    "id": "m330",
+    "en": "Phone and device",
+    "zh": "手机与设备"
+  },
+  {
+    "id": "m331",
+    "en": "Remote network",
+    "zh": "远端网络"
+  },
+  {
+    "id": "m332",
+    "en": "Cloud service",
+    "zh": "云服务"
+  },
+  {
+    "id": "m333",
+    "en": "Preparing",
+    "zh": "正在准备"
+  },
+  {
+    "id": "m334",
+    "en": "Ready",
+    "zh": "就绪"
+  },
+  {
+    "id": "m335",
+    "en": "Last recorded",
+    "zh": "上次记录"
+  },
+  {
+    "id": "m336",
+    "en": "Reporting interval unknown",
+    "zh": "上报周期未知"
+  },
+  {
+    "id": "m337",
+    "en": "Not supported by this device",
+    "zh": "此设备不支持"
+  },
+  {
+    "id": "m338",
+    "en": "My label",
+    "zh": "我的备注"
+  },
+  {
+    "id": "m339",
+    "en": "Shared name",
+    "zh": "共享名称"
+  },
+  {
+    "id": "m340",
+    "en": "Saving",
+    "zh": "正在保存"
+  },
+  {
+    "id": "m341",
+    "en": "Save failed. Try again.",
+    "zh": "保存失败，请重试"
+  },
+  {
+    "id": "m342",
+    "en": "Load more",
+    "zh": "加载更多"
+  },
+  {
+    "id": "m343",
+    "en": "Loading failed. Try again.",
+    "zh": "加载失败，请重试"
+  },
+  {
+    "id": "m344",
+    "en": "Loading",
+    "zh": "正在加载"
+  },
+  {
+    "id": "m345",
+    "en": "Rename product",
+    "zh": "重命名产品"
+  },
+  {
+    "id": "m346",
+    "en": "Settings not retrieved",
+    "zh": "尚未获取设置"
+  },
+  {
+    "id": "m347",
+    "en": "Get device settings",
+    "zh": "获取设备设置"
+  },
+  {
+    "id": "m348",
+    "en": "Advanced settings",
+    "zh": "高级设置"
+  },
+  {
+    "id": "m349",
+    "en": "Waiting for device",
+    "zh": "待设备接收"
+  },
+  {
+    "id": "m350",
+    "en": "Transmitting",
+    "zh": "传输中"
+  },
+  {
+    "id": "m351",
+    "en": "Expired",
+    "zh": "已过期"
+  },
+  {
+    "id": "m352",
+    "en": "Saved on this phone only",
+    "zh": "仅本机保存"
+  },
+  {
+    "id": "m353",
+    "en": "Waiting to sync",
+    "zh": "等待同步"
+  },
+  {
+    "id": "m354",
+    "en": "Syncing",
+    "zh": "正在同步"
+  },
+  {
+    "id": "m355",
+    "en": "Sync failed",
+    "zh": "同步失败"
+  },
+  {
+    "id": "m356",
+    "en": "Cloud monitoring active",
+    "zh": "云端监测中"
+  },
+  {
+    "id": "m357",
+    "en": "Enable alerts",
+    "zh": "启用提醒"
+  },
+  {
+    "id": "m358",
+    "en": "Monitoring has not started",
+    "zh": "尚未开始监测"
+  },
+  {
+    "id": "m359",
+    "en": "Existing collars of this gateway",
+    "zh": "当前网关的现有项圈"
+  },
+  {
+    "id": "m360",
+    "en": "Data source",
+    "zh": "数据来源"
+  },
+  {
+    "id": "m361",
+    "en": "Observed by",
+    "zh": "观测设备"
+  },
+  {
+    "id": "m362",
+    "en": "This feature is not available yet",
+    "zh": "此功能尚未开放"
+  },
+  {
+    "id": "m363",
+    "en": "Reset password",
+    "zh": "找回密码"
+  },
+  {
+    "id": "m364",
+    "en": "Reset email sent",
+    "zh": "重置邮件已发送"
+  },
+  {
+    "id": "m365",
+    "en": "Send reset email",
+    "zh": "发送重置邮件"
+  },
+  {
+    "id": "m366",
+    "en": "Download map package",
+    "zh": "下载地图包"
+  },
+  {
+    "id": "m367",
+    "en": "Downloading",
+    "zh": "下载中"
+  },
+  {
+    "id": "m368",
+    "en": "Download failed",
+    "zh": "下载失败"
+  },
+  {
+    "id": "m369",
+    "en": "Map package ready",
+    "zh": "地图包已就绪"
+  },
+  {
+    "id": "m370",
+    "en": "Delete map package?",
+    "zh": "删除地图包？"
+  },
+  {
+    "id": "m371",
+    "en": "Current area",
+    "zh": "当前区域"
+  },
+  {
+    "id": "m372",
+    "en": "Reconnect",
+    "zh": "重新连接"
+  },
+  {
+    "id": "m373",
+    "en": "Firmware version",
+    "zh": "固件版本"
+  },
+  {
+    "id": "m374",
+    "en": "Some data failed to load",
+    "zh": "部分数据加载失败"
+  },
+  {
+    "id": "m375",
+    "en": "All nodes loaded",
+    "zh": "已加载全部节点"
+  },
+  {
+    "id": "m376",
+    "en": "Applying may disconnect this device. Continue?",
+    "zh": "应用后可能断开连接，继续？"
+  },
+  {
+    "id": "m377",
+    "en": "Cloud monitoring paused",
+    "zh": "云端监测已暂停"
+  },
+  {
+    "id": "m378",
+    "en": "Reporting interval",
+    "zh": "上报周期"
+  },
+  {
+    "id": "m379",
+    "en": "Saved on this phone",
+    "zh": "已保存到本机"
+  },
+  {
+    "id": "m380",
+    "en": "Retry",
+    "zh": "重试"
+  },
+  {
+    "id": "m381",
+    "en": "Read failed",
+    "zh": "读取失败"
+  },
+  {
+    "id": "m382",
+    "en": "Operation result",
+    "zh": "操作结果"
+  },
+  {
+    "id": "m383",
+    "en": "Connection status",
+    "zh": "连接状态"
+  },
+  {
+    "id": "m384",
+    "en": "Check here if a connection fails",
+    "zh": "连接异常时，从这里检查"
+  },
+  {
+    "id": "m385",
+    "en": "Help",
+    "zh": "帮助"
+  },
+  {
+    "id": "m386",
+    "en": "Connections, chat & maps",
+    "zh": "连接、聊天与地图"
+  },
+  {
+    "id": "m387",
+    "en": "App version",
+    "zh": "应用版本"
+  },
+  {
+    "id": "m388",
+    "en": "Device information",
+    "zh": "设备信息"
+  },
+  {
+    "id": "m389",
+    "en": "Available after connecting",
+    "zh": "连接设备后可查看"
+  },
+  {
+    "id": "m390",
+    "en": "Not signed in to cloud",
+    "zh": "未登录云端"
+  },
+  {
+    "id": "m391",
+    "en": "Waiting for device updates",
+    "zh": "等待设备上报"
+  },
+  {
+    "id": "m392",
+    "en": "Details",
+    "zh": "详细信息"
+  },
+  {
+    "id": "m393",
+    "en": "Connection made simple.",
+    "zh": "让连接更简单。"
+  },
+  {
+    "id": "m394",
+    "en": "Choose a device to check.",
+    "zh": "选择需要检查的设备。"
+  },
+  {
+    "id": "m395",
+    "en": "How do I add a device?",
+    "zh": "如何添加设备？"
+  },
+  {
+    "id": "m396",
+    "en": "Power on the device, tap + on Devices, allow Bluetooth access and search nearby. Add collars through their gateway.",
+    "zh": "打开设备电源，在“设备”页点加号，允许蓝牙访问后搜索附近设备。项圈需要在网关内添加。"
+  },
+  {
+    "id": "m397",
+    "en": "Why are collar updates missing?",
+    "zh": "为什么看不到项圈更新？"
+  },
+  {
+    "id": "m398",
+    "en": "Check the gateway connection and the collar’s last report. Sleeping collars report periodically; old data is not a current location.",
+    "zh": "检查网关是否可连接，再查看项圈的最近上报时间。休眠项圈会按设定周期上报，旧数据不代表当前位置。"
+  },
+  {
+    "id": "m399",
+    "en": "Can I use maps without Internet?",
+    "zh": "没有网络时能用地图吗？"
+  },
+  {
+    "id": "m400",
+    "en": "Download the area in the app before going offline. Location access and valid position reports are still needed.",
+    "zh": "请提前在 App 中下载所需区域的离线地图。定位权限和有效的位置上报仍然需要开启。"
+  },
+  {
+    "id": "m401",
+    "en": "Does chat need an account or Internet?",
+    "zh": "聊天需要登录或互联网吗？"
+  },
+  {
+    "id": "m402",
+    "en": "Offline chat needs no cloud sign-in. Connect your phone to a chat device; the recipient must be reachable on the network.",
+    "zh": "离线聊天不需要云端登录。手机需连接聊天设备，对方也需在可通信的网络中。"
+  },
+  {
+    "id": "m403",
+    "en": "Image messages are not available yet",
+    "zh": "图片消息暂未开放"
+  },
+  {
+    "id": "m404",
+    "en": "Please sign in with an email code for now.",
+    "zh": "当前请使用邮箱验证码登录。"
+  },
+  {
+    "id": "m405",
+    "en": "Changes the name on this phone only.",
+    "zh": "仅修改你在这台手机上看到的名称。"
+  },
+  {
+    "id": "m406",
+    "en": "Updates the shared name; requires Internet and edit access.",
+    "zh": "同步修改共享名称，需要联网及编辑权限。"
+  },
+  {
+    "id": "m407",
+    "en": "No fences yet",
+    "zh": "还没有电子围栏"
+  },
+  {
+    "id": "m408",
+    "en": "Set an area for your collars and choose entry or exit alerts.",
+    "zh": "为项圈设置活动区域，并选择进入或离开提醒。"
+  },
+  {
+    "id": "m409",
+    "en": "Fence saved on this phone. Automatic alerts are not available yet.",
+    "zh": "围栏已保存在本机，自动提醒暂未开放。"
+  },
+  {
+    "id": "m410",
+    "en": "Viewing through cloud",
+    "zh": "通过云端查看"
+  },
+  {
+    "id": "m411",
+    "en": "Bluetooth connection",
+    "zh": "蓝牙连接"
+  },
+  {
+    "id": "m412",
+    "en": "Device network",
+    "zh": "设备网络"
+  },
+  {
+    "id": "m413",
+    "en": "This name is used for offline communication, separately from your account.",
+    "zh": "此名称用于离线通信，与登录账号分开保存。"
+  },
+  {
+    "id": "m414",
+    "en": "Download offline maps in the app.",
+    "zh": "请在 App 中下载离线地图。"
+  },
+  {
+    "id": "m415",
+    "en": "Device number",
+    "zh": "设备编号"
+  },
+  {
+    "id": "m416",
+    "en": "Use system setting",
+    "zh": "跟随系统"
+  },
+  {
+    "id": "m417",
+    "en": "Delete",
+    "zh": "删除"
+  },
+  {
+    "id": "m418",
+    "en": "Account",
+    "zh": "账号"
+  },
+  {
+    "id": "m419",
+    "en": "Notifications",
+    "zh": "通知"
+  },
+  {
+    "id": "m420",
+    "en": "General",
+    "zh": "通用"
+  },
+  {
+    "id": "m421",
+    "en": "HaLow profile",
+    "zh": "HaLow 配置"
+  },
+  {
+    "id": "m422",
+    "en": "Save on your phone, then apply to a device when needed.",
+    "zh": "先保存在手机，需要时再应用到设备。"
+  },
+  {
+    "id": "m423",
+    "en": "Choose a device",
+    "zh": "选择设备"
+  },
+  {
+    "id": "m424",
+    "en": "Center frequency",
+    "zh": "中心频率"
+  },
+  {
+    "id": "m425",
+    "en": "Application history",
+    "zh": "应用记录"
+  },
+  {
+    "id": "m426",
+    "en": "Not applied",
+    "zh": "尚未应用"
+  },
+  {
+    "id": "m427",
+    "en": "Discard changes",
+    "zh": "撤销修改"
+  },
+  {
+    "id": "m428",
+    "en": "Chat nickname",
+    "zh": "聊天昵称"
+  },
+  {
+    "id": "m429",
+    "en": "Not set",
+    "zh": "未设置"
+  },
+  {
+    "id": "m430",
+    "en": "Message alerts",
+    "zh": "消息提醒"
+  },
+  {
+    "id": "m431",
+    "en": "Fence alerts",
+    "zh": "围栏提醒"
+  },
+  {
+    "id": "m432",
+    "en": "Sound",
+    "zh": "声音"
+  },
+  {
+    "id": "m433",
+    "en": "Vibration",
+    "zh": "振动"
+  },
+  {
+    "id": "m434",
+    "en": "Messages and fence events remain available when alerts are off.",
+    "zh": "关闭提醒后，仍可在聊天和围栏内查看消息与事件。"
+  },
+  {
+    "id": "m435",
+    "en": "Units",
+    "zh": "单位"
+  },
+  {
+    "id": "m436",
+    "en": "Metric",
+    "zh": "公制"
+  },
+  {
+    "id": "m437",
+    "en": "Imperial",
+    "zh": "英制"
+  },
+  {
+    "id": "m438",
+    "en": "Storage",
+    "zh": "存储"
+  },
+  {
+    "id": "m439",
+    "en": "Photos and voice",
+    "zh": "图片与语音"
+  },
+  {
+    "id": "m440",
+    "en": "Clear cache",
+    "zh": "清理缓存"
+  },
+  {
+    "id": "m441",
+    "en": "Clear local photo and voice files. Keep text, device names, fences and network settings.",
+    "zh": "仅清理本机图片与语音缓存，保留文字、设备名称、围栏和网络配置。"
+  },
+  {
+    "id": "m442",
+    "en": "File cleared",
+    "zh": "文件已清理"
+  },
+  {
+    "id": "m443",
+    "en": "Nearby device",
+    "zh": "附近设备"
+  },
+  {
+    "id": "m444",
+    "en": "Identifying device",
+    "zh": "正在识别设备"
+  },
+  {
+    "id": "m445",
+    "en": "This device is not supported yet. Check its firmware.",
+    "zh": "暂不支持此设备，请检查固件。"
+  },
+  {
+    "id": "m446",
+    "en": "Could not identify the device. Try again.",
+    "zh": "未能识别设备，请重试。"
+  },
+  {
+    "id": "m447",
+    "en": "Device does not support this network profile",
+    "zh": "设备不支持这套网络配置"
+  },
+  {
+    "id": "m448",
+    "en": "Save profile",
+    "zh": "保存配置"
+  },
+  {
+    "id": "m449",
+    "en": "Apply to device",
+    "zh": "应用到设备"
+  },
+  {
+    "id": "m450",
+    "en": "Saved on phone",
+    "zh": "已保存在手机"
+  },
+  {
+    "id": "m451",
+    "en": "Device settings",
+    "zh": "设备设置"
+  },
+  {
+    "id": "m452",
+    "en": "Region and channel must be supported by the device. Devices on one network need matching settings.",
+    "zh": "地区与信道须符合设备支持范围；修改后，同一网络内的设备需要使用一致的配置。"
+  },
+  {
+    "id": "m453",
+    "en": "Test alert",
+    "zh": "测试提醒"
+  },
+  {
+    "id": "m454",
+    "en": "Focused on smart solar and outdoor IoT, with solar power and wireless connectivity products.",
+    "zh": "专注智能太阳能与户外物联网，提供太阳能供电和无线连接产品。"
+  },
+  {
+    "id": "m455",
+    "en": "Focused on edge intelligence and IoT connectivity, linking devices, local networks and cloud services.",
+    "zh": "专注边缘智能与物联网连接，连接设备、本地网络与云端服务。"
+  },
+  {
+    "id": "m456",
+    "en": "Website",
+    "zh": "官网"
+  },
+  {
+    "id": "m457",
+    "zh": "全部",
+    "en": "All"
+  },
+  {
+    "id": "m458",
+    "zh": "牧场",
+    "en": "Ranch"
+  },
+  {
+    "id": "m459",
+    "zh": "花园",
+    "en": "Garden"
+  },
+  {
+    "id": "m460",
+    "zh": "仓库",
+    "en": "Warehouse"
+  },
+  {
+    "id": "m461",
+    "zh": "区域",
+    "en": "Areas"
+  },
+  {
+    "id": "m462",
+    "zh": "此区域暂无设备",
+    "en": "No devices in this area"
+  }
+]

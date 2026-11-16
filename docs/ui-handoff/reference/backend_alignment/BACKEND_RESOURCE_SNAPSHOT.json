@@ -1,0 +1,4293 @@
+{
+  "auditDate": "2026-11-13",
+  "repository": "edgez-ai/template-offgrid-tracker",
+  "sourceCommit": "b0b35eb1d98b1ea3cdc7fcb1a3ef39a17cfc9501",
+  "scope": "Static source/configuration inventory only. Not a deployed API schema or hardware capability certification.",
+  "sdk": {
+    "name": "@edgez/react-native-sdk",
+    "version": "0.1.35",
+    "source": "01_Software_Source/app/node_modules/@edgez/react-native-sdk"
+  },
+  "tablesDB": [
+    {
+      "$id": "offgrid-tracker",
+      "name": "Offgrid Tracker",
+      "enabled": true
+    }
+  ],
+  "tables": [
+    {
+      "$id": "profiles",
+      "databaseId": "offgrid-tracker",
+      "name": "Profiles",
+      "permissions": [
+        "create(\"users\")"
+      ],
+      "rowSecurity": true,
+      "enabled": true,
+      "columns": [
+        {
+          "key": "name",
+          "type": "varchar",
+          "size": 128,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "country",
+          "type": "varchar",
+          "size": 2,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "location",
+          "type": "varchar",
+          "size": 128,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "halowChannel",
+          "type": "integer",
+          "min": 0,
+          "max": 255,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "meshId",
+          "type": "varchar",
+          "size": 32,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "meshPassphrase",
+          "type": "varchar",
+          "size": 63,
+          "required": true,
+          "array": false,
+          "encrypt": true
+        },
+        {
+          "key": "teamId",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "ownerId",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "identityId",
+          "type": "varchar",
+          "size": 64,
+          "required": false,
+          "array": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "team-id",
+          "type": "key",
+          "attributes": [
+            "teamId"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "telemetry",
+      "databaseId": "offgrid-tracker",
+      "name": "Latest telemetry",
+      "permissions": [],
+      "rowSecurity": true,
+      "enabled": true,
+      "columns": [
+        {
+          "key": "deviceId",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "profileId",
+          "type": "varchar",
+          "size": 36,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "halowMac",
+          "type": "varchar",
+          "size": 17,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "gatewayDeviceId",
+          "type": "varchar",
+          "size": 36,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "serial",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "channel",
+          "type": "varchar",
+          "size": 160,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "status",
+          "type": "varchar",
+          "size": 32,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "topic",
+          "type": "varchar",
+          "size": 320,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "payload",
+          "type": "varchar",
+          "size": 10000,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "location",
+          "type": "point",
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "icon",
+          "type": "varchar",
+          "size": 32,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "markerColor",
+          "type": "varchar",
+          "size": 32,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "receivedAt",
+          "type": "varchar",
+          "size": 40,
+          "required": true,
+          "array": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "received-at",
+          "type": "key",
+          "attributes": [
+            "receivedAt"
+          ],
+          "orders": [
+            "DESC"
+          ]
+        },
+        {
+          "key": "device-id",
+          "type": "unique",
+          "attributes": [
+            "deviceId"
+          ]
+        },
+        {
+          "key": "halow-mac",
+          "type": "unique",
+          "attributes": [
+            "halowMac"
+          ]
+        },
+        {
+          "key": "gateway-device-id",
+          "type": "key",
+          "attributes": [
+            "gatewayDeviceId"
+          ]
+        },
+        {
+          "key": "location-spatial",
+          "type": "spatial",
+          "attributes": [
+            "location"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "ota-updates",
+      "databaseId": "offgrid-tracker",
+      "name": "OTA updates",
+      "permissions": [],
+      "rowSecurity": true,
+      "enabled": true,
+      "columns": [
+        {
+          "key": "deviceId",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "serial",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "requestId",
+          "type": "varchar",
+          "size": 64,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "status",
+          "type": "varchar",
+          "size": 16,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "detail",
+          "type": "varchar",
+          "size": 256,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "firmwareVersion",
+          "type": "varchar",
+          "size": 128,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "targetFirmwareVersion",
+          "type": "varchar",
+          "size": 128,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "reportedAt",
+          "type": "varchar",
+          "size": 40,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "completedAt",
+          "type": "varchar",
+          "size": 40,
+          "required": false,
+          "array": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "request-id",
+          "type": "unique",
+          "attributes": [
+            "requestId"
+          ]
+        },
+        {
+          "key": "device-reported",
+          "type": "key",
+          "attributes": [
+            "deviceId",
+            "reportedAt"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "downlinks",
+      "databaseId": "offgrid-tracker",
+      "name": "Companion downlinks",
+      "permissions": [],
+      "rowSecurity": true,
+      "enabled": true,
+      "columns": [
+        {
+          "key": "deviceId",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "serial",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "gatewayDeviceId",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "gatewaySerial",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "requestId",
+          "type": "varchar",
+          "size": 64,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "revision",
+          "type": "integer",
+          "required": true,
+          "array": false,
+          "min": 1
+        },
+        {
+          "key": "status",
+          "type": "varchar",
+          "size": 16,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "detail",
+          "type": "varchar",
+          "size": 256,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "reportedAt",
+          "type": "varchar",
+          "size": 40,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "completedAt",
+          "type": "varchar",
+          "size": 40,
+          "required": false,
+          "array": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "request-id",
+          "type": "unique",
+          "attributes": [
+            "requestId"
+          ]
+        },
+        {
+          "key": "device-reported",
+          "type": "key",
+          "attributes": [
+            "deviceId",
+            "reportedAt"
+          ],
+          "orders": [
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "gateway-status",
+          "type": "key",
+          "attributes": [
+            "gatewayDeviceId",
+            "status"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "geofence-areas",
+      "databaseId": "offgrid-tracker",
+      "name": "Geofence areas",
+      "permissions": [
+        "create(\"users\")"
+      ],
+      "rowSecurity": true,
+      "enabled": true,
+      "columns": [
+        {
+          "key": "profileId",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "name",
+          "type": "varchar",
+          "size": 128,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "shape",
+          "type": "varchar",
+          "size": 12,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "geometry",
+          "type": "varchar",
+          "size": 4000,
+          "required": true,
+          "array": false
+        }
+      ]
+    },
+    {
+      "$id": "geofence-rules",
+      "databaseId": "offgrid-tracker",
+      "name": "Geofence rules",
+      "permissions": [
+        "create(\"users\")"
+      ],
+      "rowSecurity": true,
+      "enabled": true,
+      "columns": [
+        {
+          "key": "profileId",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "name",
+          "type": "varchar",
+          "size": 128,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "areaId",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "deviceIds",
+          "type": "varchar",
+          "size": 36,
+          "required": false,
+          "array": true
+        },
+        {
+          "key": "enterAlert",
+          "type": "boolean",
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "exitAlert",
+          "type": "boolean",
+          "required": true,
+          "array": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "profile-id",
+          "type": "key",
+          "attributes": [
+            "profileId"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "geofence-alarms",
+      "databaseId": "offgrid-tracker",
+      "name": "Geofence alarms",
+      "permissions": [],
+      "rowSecurity": true,
+      "enabled": true,
+      "columns": [
+        {
+          "key": "profileId",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "areaId",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "ruleId",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "deviceId",
+          "type": "varchar",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "event",
+          "type": "varchar",
+          "size": 8,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "active",
+          "type": "boolean",
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "acknowledged",
+          "type": "boolean",
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "lastLocation",
+          "type": "varchar",
+          "size": 128,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "raisedAt",
+          "type": "varchar",
+          "size": 40,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "clearedAt",
+          "type": "varchar",
+          "size": 40,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "acknowledgedAt",
+          "type": "varchar",
+          "size": 40,
+          "required": false,
+          "array": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "profile-active",
+          "type": "key",
+          "attributes": [
+            "profileId",
+            "active"
+          ],
+          "orders": [
+            "ASC",
+            "ASC"
+          ]
+        },
+        {
+          "key": "rule-device-event",
+          "type": "unique",
+          "attributes": [
+            "ruleId",
+            "deviceId",
+            "event"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "camera-images",
+      "databaseId": "offgrid-tracker",
+      "name": "Camera images",
+      "permissions": [],
+      "rowSecurity": true,
+      "enabled": true,
+      "columns": [
+        {
+          "key": "deviceId",
+          "type": "varchar",
+          "required": true,
+          "array": false,
+          "size": 36
+        },
+        {
+          "key": "gatewayDeviceId",
+          "type": "varchar",
+          "required": true,
+          "array": false,
+          "size": 36
+        },
+        {
+          "key": "serial",
+          "type": "varchar",
+          "required": true,
+          "array": false,
+          "size": 36
+        },
+        {
+          "key": "session",
+          "type": "varchar",
+          "required": true,
+          "array": false,
+          "size": 8
+        },
+        {
+          "key": "digest",
+          "type": "varchar",
+          "required": true,
+          "array": false,
+          "size": 8
+        },
+        {
+          "key": "status",
+          "type": "varchar",
+          "required": true,
+          "array": false,
+          "size": 16
+        },
+        {
+          "key": "fileId",
+          "type": "varchar",
+          "required": false,
+          "array": false,
+          "size": 36
+        },
+        {
+          "key": "receivedAt",
+          "type": "varchar",
+          "required": true,
+          "array": false,
+          "size": 40
+        },
+        {
+          "key": "expiresAt",
+          "type": "varchar",
+          "required": true,
+          "array": false,
+          "size": 40
+        },
+        {
+          "key": "totalBytes",
+          "type": "integer",
+          "required": true,
+          "array": false,
+          "min": 0,
+          "max": 2147483647
+        },
+        {
+          "key": "width",
+          "type": "integer",
+          "required": true,
+          "array": false,
+          "min": 0,
+          "max": 2147483647
+        },
+        {
+          "key": "height",
+          "type": "integer",
+          "required": true,
+          "array": false,
+          "min": 0,
+          "max": 2147483647
+        },
+        {
+          "key": "lastChunkSeen",
+          "type": "boolean",
+          "required": true,
+          "array": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "device-status-time",
+          "type": "key",
+          "attributes": [
+            "deviceId",
+            "status",
+            "receivedAt"
+          ],
+          "orders": [
+            "ASC",
+            "ASC",
+            "DESC"
+          ]
+        },
+        {
+          "key": "staging-expiry",
+          "type": "key",
+          "attributes": [
+            "status",
+            "expiresAt"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "camera-image-parts",
+      "databaseId": "offgrid-tracker",
+      "name": "Camera image staging",
+      "permissions": [],
+      "rowSecurity": true,
+      "enabled": true,
+      "columns": [
+        {
+          "key": "imageId",
+          "type": "varchar",
+          "required": true,
+          "array": false,
+          "size": 36
+        },
+        {
+          "key": "offset",
+          "type": "integer",
+          "required": true,
+          "array": false,
+          "min": 0,
+          "max": 2147483647
+        },
+        {
+          "key": "data",
+          "type": "varchar",
+          "required": true,
+          "array": false,
+          "size": 1468
+        },
+        {
+          "key": "expiresAt",
+          "type": "varchar",
+          "required": true,
+          "array": false,
+          "size": 40
+        }
+      ],
+      "indexes": [
+        {
+          "key": "image-id",
+          "type": "key",
+          "attributes": [
+            "imageId"
+          ]
+        },
+        {
+          "key": "staging-expiry",
+          "type": "key",
+          "attributes": [
+            "expiresAt"
+          ]
+        }
+      ]
+    }
+  ],
+  "authMethods": [
+    {
+      "$id": "email-password",
+      "name": "Email and password",
+      "enabled": false
+    },
+    {
+      "$id": "magic-url",
+      "name": "Magic URL",
+      "enabled": false
+    },
+    {
+      "$id": "email-otp",
+      "name": "Email OTP",
+      "enabled": true
+    },
+    {
+      "$id": "jwt",
+      "name": "JWT",
+      "enabled": true
+    },
+    {
+      "$id": "anonymous",
+      "name": "Anonymous sessions",
+      "enabled": false
+    }
+  ],
+  "timeseriesStores": [
+    {
+      "$id": "<PROJECT_ID>",
+      "name": "Offgrid Tracker telemetry",
+      "permissions": [
+        "read(\"users\")"
+      ],
+      "enabled": true
+    }
+  ],
+  "buckets": [
+    {
+      "$id": "camera-images",
+      "name": "Camera images",
+      "permissions": [],
+      "fileSecurity": true,
+      "enabled": true,
+      "maximumFileSize": 524288,
+      "allowedFileExtensions": [
+        "jpg"
+      ],
+      "compression": "none",
+      "encryption": true,
+      "antivirus": true
+    }
+  ],
+  "functionTriggers": [
+    {
+      "id": "offgrid-tracker",
+      "events": [
+        "devices.*.mqtt.message.publish",
+        "devices.*.delete"
+      ],
+      "schedule": "*/15 * * * *",
+      "execute": [
+        "users"
+      ],
+      "scopes": [
+        "devices.read",
+        "devices.write",
+        "rows.read",
+        "rows.write",
+        "timeseries.write",
+        "files.read",
+        "files.write"
+      ]
+    }
+  ],
+  "radio": {
+    "source": "firmware/platforms/esp-halow/halow/components/mm-iot-sdk/framework/src/mmregdb/mmregdb.c",
+    "espHalowCommit": "c2938cbcbb7e90213581c7b68ba090f3b6d61698",
+    "mmIotSdkCommit": "ad3551b58dbaaa969e5f32dda3ca6a3ca45372c4",
+    "note": "All registered default domains, including default AU REVMF. Build overrides, SKU limits and certification are not verified.",
+    "catalog": {
+      "AU": [
+        {
+          "frequencyHz": 916000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 50,
+          "s1gOperatingClass": 22,
+          "number": 28,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 916.0
+        },
+        {
+          "frequencyHz": 917000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 50,
+          "s1gOperatingClass": 22,
+          "number": 30,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 917.0
+        },
+        {
+          "frequencyHz": 918000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 50,
+          "s1gOperatingClass": 22,
+          "number": 32,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 918.0
+        },
+        {
+          "frequencyHz": 919000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 50,
+          "s1gOperatingClass": 22,
+          "number": 34,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 919.0
+        },
+        {
+          "frequencyHz": 920000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 50,
+          "s1gOperatingClass": 22,
+          "number": 36,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 920.0
+        },
+        {
+          "frequencyHz": 921000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 50,
+          "s1gOperatingClass": 22,
+          "number": 38,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 921.0
+        },
+        {
+          "frequencyHz": 922000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 50,
+          "s1gOperatingClass": 22,
+          "number": 40,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 922.0
+        },
+        {
+          "frequencyHz": 923000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 50,
+          "s1gOperatingClass": 22,
+          "number": 42,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 923.0
+        },
+        {
+          "frequencyHz": 924000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 50,
+          "s1gOperatingClass": 22,
+          "number": 44,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 924.0
+        },
+        {
+          "frequencyHz": 925000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 50,
+          "s1gOperatingClass": 22,
+          "number": 46,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 925.0
+        },
+        {
+          "frequencyHz": 926000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 50,
+          "s1gOperatingClass": 22,
+          "number": 48,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 926.0
+        },
+        {
+          "frequencyHz": 927000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 50,
+          "s1gOperatingClass": 22,
+          "number": 50,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 927.0
+        },
+        {
+          "frequencyHz": 916500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 51,
+          "s1gOperatingClass": 23,
+          "number": 29,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 916.5
+        },
+        {
+          "frequencyHz": 918500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 51,
+          "s1gOperatingClass": 23,
+          "number": 33,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 918.5
+        },
+        {
+          "frequencyHz": 920500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 51,
+          "s1gOperatingClass": 23,
+          "number": 37,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 920.5
+        },
+        {
+          "frequencyHz": 922500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 51,
+          "s1gOperatingClass": 23,
+          "number": 41,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 922.5
+        },
+        {
+          "frequencyHz": 924500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 51,
+          "s1gOperatingClass": 23,
+          "number": 45,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 924.5
+        },
+        {
+          "frequencyHz": 926500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 51,
+          "s1gOperatingClass": 23,
+          "number": 49,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 926.5
+        },
+        {
+          "frequencyHz": 917500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 52,
+          "s1gOperatingClass": 24,
+          "number": 31,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 917.5
+        },
+        {
+          "frequencyHz": 921500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 52,
+          "s1gOperatingClass": 24,
+          "number": 39,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 921.5
+        },
+        {
+          "frequencyHz": 925500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 52,
+          "s1gOperatingClass": 24,
+          "number": 47,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 925.5
+        },
+        {
+          "frequencyHz": 919500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 53,
+          "s1gOperatingClass": 25,
+          "number": 35,
+          "bandwidthMHz": 8,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 919.5
+        },
+        {
+          "frequencyHz": 923500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 53,
+          "s1gOperatingClass": 25,
+          "number": 43,
+          "bandwidthMHz": 8,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 923.5
+        },
+        {
+          "frequencyHz": 919500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 48,
+          "s1gOperatingClass": 39,
+          "number": 51,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 919.5
+        },
+        {
+          "frequencyHz": 923500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 48,
+          "s1gOperatingClass": 39,
+          "number": 59,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 923.5
+        },
+        {
+          "frequencyHz": 921500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 49,
+          "s1gOperatingClass": 40,
+          "number": 55,
+          "bandwidthMHz": 8,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 921.5
+        }
+      ],
+      "CA": [
+        {
+          "frequencyHz": 902500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 1,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 902.5
+        },
+        {
+          "frequencyHz": 903500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 3,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 903.5
+        },
+        {
+          "frequencyHz": 904500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 5,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 904.5
+        },
+        {
+          "frequencyHz": 905500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 7,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 905.5
+        },
+        {
+          "frequencyHz": 906500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 9,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 906.5
+        },
+        {
+          "frequencyHz": 907500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 11,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 907.5
+        },
+        {
+          "frequencyHz": 908500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 13,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 908.5
+        },
+        {
+          "frequencyHz": 909500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 15,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 909.5
+        },
+        {
+          "frequencyHz": 910500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 17,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 910.5
+        },
+        {
+          "frequencyHz": 911500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 19,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 911.5
+        },
+        {
+          "frequencyHz": 912500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 21,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 912.5
+        },
+        {
+          "frequencyHz": 913500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 23,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 913.5
+        },
+        {
+          "frequencyHz": 914500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 25,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 914.5
+        },
+        {
+          "frequencyHz": 915500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 27,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 915.5
+        },
+        {
+          "frequencyHz": 916500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 29,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 916.5
+        },
+        {
+          "frequencyHz": 917500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 31,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 917.5
+        },
+        {
+          "frequencyHz": 918500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 33,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 918.5
+        },
+        {
+          "frequencyHz": 919500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 35,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 919.5
+        },
+        {
+          "frequencyHz": 920500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 37,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 920.5
+        },
+        {
+          "frequencyHz": 921500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 39,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 921.5
+        },
+        {
+          "frequencyHz": 922500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 41,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 922.5
+        },
+        {
+          "frequencyHz": 923500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 43,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 923.5
+        },
+        {
+          "frequencyHz": 924500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 45,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 924.5
+        },
+        {
+          "frequencyHz": 925500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 47,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 925.5
+        },
+        {
+          "frequencyHz": 926500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 49,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 926.5
+        },
+        {
+          "frequencyHz": 927500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 51,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 927.5
+        },
+        {
+          "frequencyHz": 903000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 2,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 903.0
+        },
+        {
+          "frequencyHz": 905000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 6,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 905.0
+        },
+        {
+          "frequencyHz": 907000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 10,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 907.0
+        },
+        {
+          "frequencyHz": 909000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 14,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 909.0
+        },
+        {
+          "frequencyHz": 911000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 18,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 911.0
+        },
+        {
+          "frequencyHz": 913000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 22,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 913.0
+        },
+        {
+          "frequencyHz": 915000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 26,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 915.0
+        },
+        {
+          "frequencyHz": 917000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 30,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 917.0
+        },
+        {
+          "frequencyHz": 919000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 34,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 919.0
+        },
+        {
+          "frequencyHz": 921000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 38,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 921.0
+        },
+        {
+          "frequencyHz": 923000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 42,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 923.0
+        },
+        {
+          "frequencyHz": 925000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 46,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 925.0
+        },
+        {
+          "frequencyHz": 927000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 50,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 927.0
+        },
+        {
+          "frequencyHz": 906000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 3,
+          "number": 8,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 906.0
+        },
+        {
+          "frequencyHz": 910000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 3,
+          "number": 16,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 910.0
+        },
+        {
+          "frequencyHz": 914000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 3,
+          "number": 24,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 914.0
+        },
+        {
+          "frequencyHz": 918000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 3,
+          "number": 32,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 918.0
+        },
+        {
+          "frequencyHz": 922000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 3,
+          "number": 40,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 922.0
+        },
+        {
+          "frequencyHz": 926000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 3,
+          "number": 48,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 926.0
+        },
+        {
+          "frequencyHz": 908000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 71,
+          "s1gOperatingClass": 4,
+          "number": 12,
+          "bandwidthMHz": 8,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 908.0
+        },
+        {
+          "frequencyHz": 916000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 71,
+          "s1gOperatingClass": 4,
+          "number": 28,
+          "bandwidthMHz": 8,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 916.0
+        },
+        {
+          "frequencyHz": 924000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 71,
+          "s1gOperatingClass": 4,
+          "number": 44,
+          "bandwidthMHz": 8,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 924.0
+        }
+      ],
+      "EU": [
+        {
+          "frequencyHz": 863500000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 66,
+          "s1gOperatingClass": 6,
+          "number": 1,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 863.5
+        },
+        {
+          "frequencyHz": 864500000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 66,
+          "s1gOperatingClass": 6,
+          "number": 3,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 864.5
+        },
+        {
+          "frequencyHz": 865500000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 66,
+          "s1gOperatingClass": 6,
+          "number": 5,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 865.5
+        },
+        {
+          "frequencyHz": 866500000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 66,
+          "s1gOperatingClass": 6,
+          "number": 7,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 866.5
+        },
+        {
+          "frequencyHz": 867500000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 66,
+          "s1gOperatingClass": 6,
+          "number": 9,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 867.5
+        }
+      ],
+      "GB": [
+        {
+          "frequencyHz": 863500000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 66,
+          "s1gOperatingClass": 6,
+          "number": 1,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 863.5
+        },
+        {
+          "frequencyHz": 864500000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 66,
+          "s1gOperatingClass": 6,
+          "number": 3,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 864.5
+        },
+        {
+          "frequencyHz": 865500000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 66,
+          "s1gOperatingClass": 6,
+          "number": 5,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 865.5
+        },
+        {
+          "frequencyHz": 866500000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 66,
+          "s1gOperatingClass": 6,
+          "number": 7,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 866.5
+        },
+        {
+          "frequencyHz": 867500000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 66,
+          "s1gOperatingClass": 6,
+          "number": 9,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 867.5
+        },
+        {
+          "frequencyHz": 917900000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 77,
+          "s1gOperatingClass": 30,
+          "number": 33,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 917.9
+        },
+        {
+          "frequencyHz": 918900000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 77,
+          "s1gOperatingClass": 30,
+          "number": 35,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 918.9
+        }
+      ],
+      "IN": [
+        {
+          "frequencyHz": 865500000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 66,
+          "s1gOperatingClass": 6,
+          "number": 5,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 865.5
+        },
+        {
+          "frequencyHz": 866500000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 66,
+          "s1gOperatingClass": 6,
+          "number": 7,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 866.5
+        },
+        {
+          "frequencyHz": 867500000,
+          "dutyCycleCentiPercent": 280,
+          "omitControlResponse": false,
+          "globalOperatingClass": 66,
+          "s1gOperatingClass": 6,
+          "number": 9,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 867.5
+        }
+      ],
+      "JP": [
+        {
+          "frequencyHz": 921000000,
+          "dutyCycleCentiPercent": 1000,
+          "omitControlResponse": true,
+          "globalOperatingClass": 73,
+          "s1gOperatingClass": 8,
+          "number": 9,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 2000,
+          "airtimeMinUs": 2000,
+          "airtimeMaxUs": 100000,
+          "frequencyMHz": 921.0
+        },
+        {
+          "frequencyHz": 923000000,
+          "dutyCycleCentiPercent": 1000,
+          "omitControlResponse": true,
+          "globalOperatingClass": 73,
+          "s1gOperatingClass": 8,
+          "number": 13,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 2000,
+          "airtimeMinUs": 2000,
+          "airtimeMaxUs": 100000,
+          "frequencyMHz": 923.0
+        },
+        {
+          "frequencyHz": 924000000,
+          "dutyCycleCentiPercent": 1000,
+          "omitControlResponse": true,
+          "globalOperatingClass": 73,
+          "s1gOperatingClass": 8,
+          "number": 15,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 2000,
+          "airtimeMinUs": 2000,
+          "airtimeMaxUs": 100000,
+          "frequencyMHz": 924.0
+        },
+        {
+          "frequencyHz": 925000000,
+          "dutyCycleCentiPercent": 1000,
+          "omitControlResponse": true,
+          "globalOperatingClass": 73,
+          "s1gOperatingClass": 8,
+          "number": 17,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 2000,
+          "airtimeMinUs": 2000,
+          "airtimeMaxUs": 100000,
+          "frequencyMHz": 925.0
+        },
+        {
+          "frequencyHz": 926000000,
+          "dutyCycleCentiPercent": 1000,
+          "omitControlResponse": true,
+          "globalOperatingClass": 73,
+          "s1gOperatingClass": 8,
+          "number": 19,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 2000,
+          "airtimeMinUs": 2000,
+          "airtimeMaxUs": 100000,
+          "frequencyMHz": 926.0
+        },
+        {
+          "frequencyHz": 927000000,
+          "dutyCycleCentiPercent": 1000,
+          "omitControlResponse": true,
+          "globalOperatingClass": 73,
+          "s1gOperatingClass": 8,
+          "number": 21,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 2000,
+          "airtimeMinUs": 2000,
+          "airtimeMaxUs": 100000,
+          "frequencyMHz": 927.0
+        },
+        {
+          "frequencyHz": 923500000,
+          "dutyCycleCentiPercent": 1000,
+          "omitControlResponse": true,
+          "globalOperatingClass": 64,
+          "s1gOperatingClass": 9,
+          "number": 2,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 2000,
+          "airtimeMinUs": 2000,
+          "airtimeMaxUs": 100000,
+          "frequencyMHz": 923.5
+        },
+        {
+          "frequencyHz": 924500000,
+          "dutyCycleCentiPercent": 1000,
+          "omitControlResponse": true,
+          "globalOperatingClass": 64,
+          "s1gOperatingClass": 10,
+          "number": 4,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 2000,
+          "airtimeMinUs": 2000,
+          "airtimeMaxUs": 100000,
+          "frequencyMHz": 924.5
+        },
+        {
+          "frequencyHz": 925500000,
+          "dutyCycleCentiPercent": 1000,
+          "omitControlResponse": true,
+          "globalOperatingClass": 64,
+          "s1gOperatingClass": 9,
+          "number": 6,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 2000,
+          "airtimeMinUs": 2000,
+          "airtimeMaxUs": 100000,
+          "frequencyMHz": 925.5
+        },
+        {
+          "frequencyHz": 926500000,
+          "dutyCycleCentiPercent": 1000,
+          "omitControlResponse": true,
+          "globalOperatingClass": 64,
+          "s1gOperatingClass": 10,
+          "number": 8,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 2000,
+          "airtimeMinUs": 2000,
+          "airtimeMaxUs": 100000,
+          "frequencyMHz": 926.5
+        },
+        {
+          "frequencyHz": 924500000,
+          "dutyCycleCentiPercent": 1000,
+          "omitControlResponse": true,
+          "globalOperatingClass": 65,
+          "s1gOperatingClass": 11,
+          "number": 36,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 2000,
+          "airtimeMinUs": 2000,
+          "airtimeMaxUs": 100000,
+          "frequencyMHz": 924.5
+        },
+        {
+          "frequencyHz": 925500000,
+          "dutyCycleCentiPercent": 1000,
+          "omitControlResponse": true,
+          "globalOperatingClass": 65,
+          "s1gOperatingClass": 12,
+          "number": 38,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 16,
+          "minPacketSpacingUs": 2000,
+          "airtimeMinUs": 2000,
+          "airtimeMaxUs": 100000,
+          "frequencyMHz": 925.5
+        }
+      ],
+      "KR": [
+        {
+          "frequencyHz": 918000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 74,
+          "s1gOperatingClass": 14,
+          "number": 1,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 4,
+          "minPacketSpacingUs": 50000,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 4000000,
+          "frequencyMHz": 918.0
+        },
+        {
+          "frequencyHz": 919000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 74,
+          "s1gOperatingClass": 14,
+          "number": 3,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 4,
+          "minPacketSpacingUs": 50000,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 4000000,
+          "frequencyMHz": 919.0
+        },
+        {
+          "frequencyHz": 920000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 74,
+          "s1gOperatingClass": 14,
+          "number": 5,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 4,
+          "minPacketSpacingUs": 50000,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 4000000,
+          "frequencyMHz": 920.0
+        },
+        {
+          "frequencyHz": 921000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 74,
+          "s1gOperatingClass": 14,
+          "number": 7,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 4,
+          "minPacketSpacingUs": 50000,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 4000000,
+          "frequencyMHz": 921.0
+        },
+        {
+          "frequencyHz": 922000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 74,
+          "s1gOperatingClass": 14,
+          "number": 9,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 10,
+          "minPacketSpacingUs": 50000,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 4000000,
+          "frequencyMHz": 922.0
+        },
+        {
+          "frequencyHz": 923000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 74,
+          "s1gOperatingClass": 14,
+          "number": 11,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 10,
+          "minPacketSpacingUs": 50000,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 4000000,
+          "frequencyMHz": 923.0
+        },
+        {
+          "frequencyHz": 918500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 75,
+          "s1gOperatingClass": 15,
+          "number": 2,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 4,
+          "minPacketSpacingUs": 50000,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 4000000,
+          "frequencyMHz": 918.5
+        },
+        {
+          "frequencyHz": 920500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 75,
+          "s1gOperatingClass": 15,
+          "number": 6,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 4,
+          "minPacketSpacingUs": 50000,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 4000000,
+          "frequencyMHz": 920.5
+        },
+        {
+          "frequencyHz": 922500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 75,
+          "s1gOperatingClass": 15,
+          "number": 10,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 10,
+          "minPacketSpacingUs": 50000,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 4000000,
+          "frequencyMHz": 922.5
+        },
+        {
+          "frequencyHz": 921500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 76,
+          "s1gOperatingClass": 16,
+          "number": 8,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 4,
+          "minPacketSpacingUs": 50000,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 4000000,
+          "frequencyMHz": 921.5
+        },
+        {
+          "frequencyHz": 926500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 74,
+          "s1gOperatingClass": 14,
+          "number": 18,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 17,
+          "minPacketSpacingUs": 264,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 220000,
+          "frequencyMHz": 926.5
+        },
+        {
+          "frequencyHz": 927500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 74,
+          "s1gOperatingClass": 14,
+          "number": 20,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 17,
+          "minPacketSpacingUs": 264,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 220000,
+          "frequencyMHz": 927.5
+        },
+        {
+          "frequencyHz": 928500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 74,
+          "s1gOperatingClass": 14,
+          "number": 22,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 17,
+          "minPacketSpacingUs": 264,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 220000,
+          "frequencyMHz": 928.5
+        },
+        {
+          "frequencyHz": 929500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 74,
+          "s1gOperatingClass": 14,
+          "number": 24,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 17,
+          "minPacketSpacingUs": 264,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 220000,
+          "frequencyMHz": 929.5
+        },
+        {
+          "frequencyHz": 927000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 75,
+          "s1gOperatingClass": 15,
+          "number": 19,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 20,
+          "minPacketSpacingUs": 264,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 220000,
+          "frequencyMHz": 927.0
+        },
+        {
+          "frequencyHz": 929000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 75,
+          "s1gOperatingClass": 15,
+          "number": 23,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 20,
+          "minPacketSpacingUs": 264,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 220000,
+          "frequencyMHz": 929.0
+        }
+      ],
+      "NZ": [
+        {
+          "frequencyHz": 915500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 26,
+          "number": 27,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 915.5
+        },
+        {
+          "frequencyHz": 916500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 26,
+          "number": 29,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 916.5
+        },
+        {
+          "frequencyHz": 917500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 26,
+          "number": 31,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 917.5
+        },
+        {
+          "frequencyHz": 918500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 26,
+          "number": 33,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 918.5
+        },
+        {
+          "frequencyHz": 919500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 26,
+          "number": 35,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 919.5
+        },
+        {
+          "frequencyHz": 920500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 26,
+          "number": 37,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 920.5
+        },
+        {
+          "frequencyHz": 921500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 26,
+          "number": 39,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 921.5
+        },
+        {
+          "frequencyHz": 922500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 26,
+          "number": 41,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 922.5
+        },
+        {
+          "frequencyHz": 923500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 26,
+          "number": 43,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 923.5
+        },
+        {
+          "frequencyHz": 924500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 26,
+          "number": 45,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 924.5
+        },
+        {
+          "frequencyHz": 925500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 26,
+          "number": 47,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 925.5
+        },
+        {
+          "frequencyHz": 926500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 26,
+          "number": 49,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 926.5
+        },
+        {
+          "frequencyHz": 927500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 26,
+          "number": 51,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 927.5
+        },
+        {
+          "frequencyHz": 917000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 27,
+          "number": 30,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 917.0
+        },
+        {
+          "frequencyHz": 919000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 27,
+          "number": 34,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 919.0
+        },
+        {
+          "frequencyHz": 921000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 27,
+          "number": 38,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 921.0
+        },
+        {
+          "frequencyHz": 923000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 27,
+          "number": 42,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 923.0
+        },
+        {
+          "frequencyHz": 925000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 27,
+          "number": 46,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 925.0
+        },
+        {
+          "frequencyHz": 927000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 27,
+          "number": 50,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 927.0
+        },
+        {
+          "frequencyHz": 918000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 28,
+          "number": 32,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 30,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 918.0
+        },
+        {
+          "frequencyHz": 922000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 28,
+          "number": 40,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 922.0
+        },
+        {
+          "frequencyHz": 926000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 28,
+          "number": 48,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 926.0
+        },
+        {
+          "frequencyHz": 924000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 71,
+          "s1gOperatingClass": 29,
+          "number": 44,
+          "bandwidthMHz": 8,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 924.0
+        }
+      ],
+      "US": [
+        {
+          "frequencyHz": 902500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 1,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 902.5
+        },
+        {
+          "frequencyHz": 903500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 3,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 903.5
+        },
+        {
+          "frequencyHz": 904500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 5,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 904.5
+        },
+        {
+          "frequencyHz": 905500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 7,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 905.5
+        },
+        {
+          "frequencyHz": 906500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 9,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 906.5
+        },
+        {
+          "frequencyHz": 907500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 11,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 907.5
+        },
+        {
+          "frequencyHz": 908500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 13,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 908.5
+        },
+        {
+          "frequencyHz": 909500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 15,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 909.5
+        },
+        {
+          "frequencyHz": 910500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 17,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 910.5
+        },
+        {
+          "frequencyHz": 911500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 19,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 911.5
+        },
+        {
+          "frequencyHz": 912500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 21,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 912.5
+        },
+        {
+          "frequencyHz": 913500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 23,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 913.5
+        },
+        {
+          "frequencyHz": 914500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 25,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 914.5
+        },
+        {
+          "frequencyHz": 915500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 27,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 915.5
+        },
+        {
+          "frequencyHz": 916500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 29,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 916.5
+        },
+        {
+          "frequencyHz": 917500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 31,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 917.5
+        },
+        {
+          "frequencyHz": 918500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 33,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 918.5
+        },
+        {
+          "frequencyHz": 919500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 35,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 919.5
+        },
+        {
+          "frequencyHz": 920500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 37,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 920.5
+        },
+        {
+          "frequencyHz": 921500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 39,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 921.5
+        },
+        {
+          "frequencyHz": 922500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 41,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 922.5
+        },
+        {
+          "frequencyHz": 923500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 43,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 923.5
+        },
+        {
+          "frequencyHz": 924500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 45,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 924.5
+        },
+        {
+          "frequencyHz": 925500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 47,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 925.5
+        },
+        {
+          "frequencyHz": 926500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 49,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 926.5
+        },
+        {
+          "frequencyHz": 927500000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 68,
+          "s1gOperatingClass": 1,
+          "number": 51,
+          "bandwidthMHz": 1,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 927.5
+        },
+        {
+          "frequencyHz": 903000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 2,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 903.0
+        },
+        {
+          "frequencyHz": 905000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 6,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 905.0
+        },
+        {
+          "frequencyHz": 907000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 10,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 907.0
+        },
+        {
+          "frequencyHz": 909000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 14,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 909.0
+        },
+        {
+          "frequencyHz": 911000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 18,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 911.0
+        },
+        {
+          "frequencyHz": 913000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 22,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 913.0
+        },
+        {
+          "frequencyHz": 915000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 26,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 915.0
+        },
+        {
+          "frequencyHz": 917000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 30,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 917.0
+        },
+        {
+          "frequencyHz": 919000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 34,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 919.0
+        },
+        {
+          "frequencyHz": 921000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 38,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 921.0
+        },
+        {
+          "frequencyHz": 923000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 42,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 923.0
+        },
+        {
+          "frequencyHz": 925000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 46,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 925.0
+        },
+        {
+          "frequencyHz": 927000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 69,
+          "s1gOperatingClass": 2,
+          "number": 50,
+          "bandwidthMHz": 2,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 927.0
+        },
+        {
+          "frequencyHz": 906000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 3,
+          "number": 8,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 906.0
+        },
+        {
+          "frequencyHz": 910000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 3,
+          "number": 16,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 910.0
+        },
+        {
+          "frequencyHz": 914000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 3,
+          "number": 24,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 914.0
+        },
+        {
+          "frequencyHz": 918000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 3,
+          "number": 32,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 918.0
+        },
+        {
+          "frequencyHz": 922000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 3,
+          "number": 40,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 922.0
+        },
+        {
+          "frequencyHz": 926000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 70,
+          "s1gOperatingClass": 3,
+          "number": 48,
+          "bandwidthMHz": 4,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 926.0
+        },
+        {
+          "frequencyHz": 908000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 71,
+          "s1gOperatingClass": 4,
+          "number": 12,
+          "bandwidthMHz": 8,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 908.0
+        },
+        {
+          "frequencyHz": 916000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 71,
+          "s1gOperatingClass": 4,
+          "number": 28,
+          "bandwidthMHz": 8,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 916.0
+        },
+        {
+          "frequencyHz": 924000000,
+          "dutyCycleCentiPercent": 10000,
+          "omitControlResponse": false,
+          "globalOperatingClass": 71,
+          "s1gOperatingClass": 4,
+          "number": 44,
+          "bandwidthMHz": 8,
+          "maxEirpDbm": 36,
+          "minPacketSpacingUs": 0,
+          "airtimeMinUs": 0,
+          "airtimeMaxUs": 0,
+          "frequencyMHz": 924.0
+        }
+      ]
+    },
+    "appComparison": [
+      {
+        "country": "AU",
+        "appChannels": [
+          {
+            "number": 27,
+            "frequencyMHz": 915.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 29,
+            "frequencyMHz": 916.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 31,
+            "frequencyMHz": 917.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 33,
+            "frequencyMHz": 918.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 35,
+            "frequencyMHz": 919.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 37,
+            "frequencyMHz": 920.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 39,
+            "frequencyMHz": 921.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 41,
+            "frequencyMHz": 922.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 43,
+            "frequencyMHz": 923.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 45,
+            "frequencyMHz": 924.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 47,
+            "frequencyMHz": 925.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 49,
+            "frequencyMHz": 926.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 51,
+            "frequencyMHz": 927.5,
+            "bandwidthMHz": 1
+          }
+        ],
+        "appRecords": 13,
+        "templateRecords": 26
+      },
+      {
+        "country": "CA",
+        "appChannels": [
+          {
+            "number": 1,
+            "frequencyMHz": 902.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 3,
+            "frequencyMHz": 903.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 5,
+            "frequencyMHz": 904.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 7,
+            "frequencyMHz": 905.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 9,
+            "frequencyMHz": 906.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 11,
+            "frequencyMHz": 907.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 13,
+            "frequencyMHz": 908.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 15,
+            "frequencyMHz": 909.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 17,
+            "frequencyMHz": 910.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 19,
+            "frequencyMHz": 911.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 21,
+            "frequencyMHz": 912.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 23,
+            "frequencyMHz": 913.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 25,
+            "frequencyMHz": 914.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 27,
+            "frequencyMHz": 915.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 29,
+            "frequencyMHz": 916.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 31,
+            "frequencyMHz": 917.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 33,
+            "frequencyMHz": 918.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 35,
+            "frequencyMHz": 919.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 37,
+            "frequencyMHz": 920.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 39,
+            "frequencyMHz": 921.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 41,
+            "frequencyMHz": 922.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 43,
+            "frequencyMHz": 923.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 45,
+            "frequencyMHz": 924.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 47,
+            "frequencyMHz": 925.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 49,
+            "frequencyMHz": 926.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 51,
+            "frequencyMHz": 927.5,
+            "bandwidthMHz": 1
+          }
+        ],
+        "appRecords": 26,
+        "templateRecords": 48
+      },
+      {
+        "country": "EU",
+        "appChannels": [
+          {
+            "number": 1,
+            "frequencyMHz": 863.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 3,
+            "frequencyMHz": 864.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 5,
+            "frequencyMHz": 865.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 7,
+            "frequencyMHz": 866.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 9,
+            "frequencyMHz": 867.5,
+            "bandwidthMHz": 1
+          }
+        ],
+        "appRecords": 5,
+        "templateRecords": 5
+      },
+      {
+        "country": "GB",
+        "appChannels": [
+          {
+            "number": 1,
+            "frequencyMHz": 863.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 3,
+            "frequencyMHz": 864.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 5,
+            "frequencyMHz": 865.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 7,
+            "frequencyMHz": 866.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 9,
+            "frequencyMHz": 867.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 33,
+            "frequencyMHz": 917.9,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 35,
+            "frequencyMHz": 918.9,
+            "bandwidthMHz": 1
+          }
+        ],
+        "appRecords": 7,
+        "templateRecords": 7
+      },
+      {
+        "country": "IN",
+        "appChannels": [
+          {
+            "number": 5,
+            "frequencyMHz": 865.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 7,
+            "frequencyMHz": 866.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 9,
+            "frequencyMHz": 867.5,
+            "bandwidthMHz": 1
+          }
+        ],
+        "appRecords": 3,
+        "templateRecords": 3
+      },
+      {
+        "country": "JP",
+        "appChannels": [
+          {
+            "number": 9,
+            "frequencyMHz": 921.0,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 13,
+            "frequencyMHz": 923.0,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 15,
+            "frequencyMHz": 924.0,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 17,
+            "frequencyMHz": 925.0,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 19,
+            "frequencyMHz": 926.0,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 21,
+            "frequencyMHz": 927.0,
+            "bandwidthMHz": 1
+          }
+        ],
+        "appRecords": 6,
+        "templateRecords": 12
+      },
+      {
+        "country": "KR",
+        "appChannels": [
+          {
+            "number": 1,
+            "frequencyMHz": 918.0,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 3,
+            "frequencyMHz": 919.0,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 5,
+            "frequencyMHz": 920.0,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 7,
+            "frequencyMHz": 921.0,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 9,
+            "frequencyMHz": 922.0,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 11,
+            "frequencyMHz": 923.0,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 18,
+            "frequencyMHz": 926.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 20,
+            "frequencyMHz": 927.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 22,
+            "frequencyMHz": 928.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 24,
+            "frequencyMHz": 929.5,
+            "bandwidthMHz": 1
+          }
+        ],
+        "appRecords": 10,
+        "templateRecords": 16
+      },
+      {
+        "country": "NZ",
+        "appChannels": [
+          {
+            "number": 27,
+            "frequencyMHz": 915.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 29,
+            "frequencyMHz": 916.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 31,
+            "frequencyMHz": 917.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 33,
+            "frequencyMHz": 918.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 35,
+            "frequencyMHz": 919.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 37,
+            "frequencyMHz": 920.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 39,
+            "frequencyMHz": 921.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 41,
+            "frequencyMHz": 922.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 43,
+            "frequencyMHz": 923.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 45,
+            "frequencyMHz": 924.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 47,
+            "frequencyMHz": 925.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 49,
+            "frequencyMHz": 926.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 51,
+            "frequencyMHz": 927.5,
+            "bandwidthMHz": 1
+          }
+        ],
+        "appRecords": 13,
+        "templateRecords": 23
+      },
+      {
+        "country": "US",
+        "appChannels": [
+          {
+            "number": 1,
+            "frequencyMHz": 902.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 2,
+            "frequencyMHz": 903.0,
+            "bandwidthMHz": 2.0
+          },
+          {
+            "number": 3,
+            "frequencyMHz": 903.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 5,
+            "frequencyMHz": 904.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 6,
+            "frequencyMHz": 905.0,
+            "bandwidthMHz": 2.0
+          },
+          {
+            "number": 7,
+            "frequencyMHz": 905.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 8,
+            "frequencyMHz": 906.0,
+            "bandwidthMHz": 4.0
+          },
+          {
+            "number": 9,
+            "frequencyMHz": 906.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 10,
+            "frequencyMHz": 907.0,
+            "bandwidthMHz": 2.0
+          },
+          {
+            "number": 11,
+            "frequencyMHz": 907.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 12,
+            "frequencyMHz": 908.0,
+            "bandwidthMHz": 8.0
+          },
+          {
+            "number": 13,
+            "frequencyMHz": 908.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 14,
+            "frequencyMHz": 909.0,
+            "bandwidthMHz": 2.0
+          },
+          {
+            "number": 15,
+            "frequencyMHz": 909.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 16,
+            "frequencyMHz": 910.0,
+            "bandwidthMHz": 4.0
+          },
+          {
+            "number": 17,
+            "frequencyMHz": 910.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 18,
+            "frequencyMHz": 911.0,
+            "bandwidthMHz": 2.0
+          },
+          {
+            "number": 19,
+            "frequencyMHz": 911.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 21,
+            "frequencyMHz": 912.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 22,
+            "frequencyMHz": 913.0,
+            "bandwidthMHz": 2.0
+          },
+          {
+            "number": 23,
+            "frequencyMHz": 913.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 24,
+            "frequencyMHz": 914.0,
+            "bandwidthMHz": 4.0
+          },
+          {
+            "number": 25,
+            "frequencyMHz": 914.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 26,
+            "frequencyMHz": 915.0,
+            "bandwidthMHz": 2.0
+          },
+          {
+            "number": 27,
+            "frequencyMHz": 915.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 28,
+            "frequencyMHz": 916.0,
+            "bandwidthMHz": 8.0
+          },
+          {
+            "number": 29,
+            "frequencyMHz": 916.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 30,
+            "frequencyMHz": 917.0,
+            "bandwidthMHz": 2.0
+          },
+          {
+            "number": 31,
+            "frequencyMHz": 917.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 32,
+            "frequencyMHz": 918.0,
+            "bandwidthMHz": 4.0
+          },
+          {
+            "number": 33,
+            "frequencyMHz": 918.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 34,
+            "frequencyMHz": 919.0,
+            "bandwidthMHz": 2.0
+          },
+          {
+            "number": 35,
+            "frequencyMHz": 919.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 37,
+            "frequencyMHz": 920.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 38,
+            "frequencyMHz": 921.0,
+            "bandwidthMHz": 2.0
+          },
+          {
+            "number": 39,
+            "frequencyMHz": 921.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 40,
+            "frequencyMHz": 922.0,
+            "bandwidthMHz": 4.0
+          },
+          {
+            "number": 41,
+            "frequencyMHz": 922.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 42,
+            "frequencyMHz": 923.0,
+            "bandwidthMHz": 2.0
+          },
+          {
+            "number": 43,
+            "frequencyMHz": 923.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 44,
+            "frequencyMHz": 924.0,
+            "bandwidthMHz": 8.0
+          },
+          {
+            "number": 45,
+            "frequencyMHz": 924.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 46,
+            "frequencyMHz": 925.0,
+            "bandwidthMHz": 2.0
+          },
+          {
+            "number": 47,
+            "frequencyMHz": 925.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 48,
+            "frequencyMHz": 926.0,
+            "bandwidthMHz": 4.0
+          },
+          {
+            "number": 49,
+            "frequencyMHz": 926.5,
+            "bandwidthMHz": 1
+          },
+          {
+            "number": 50,
+            "frequencyMHz": 927.0,
+            "bandwidthMHz": 2.0
+          },
+          {
+            "number": 51,
+            "frequencyMHz": 927.5,
+            "bandwidthMHz": 1
+          }
+        ],
+        "appRecords": 48,
+        "templateRecords": 48
+      }
+    ]
+  }
+}

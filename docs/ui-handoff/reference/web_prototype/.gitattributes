@@ -1,0 +1,5 @@
+# Preserve exact source bytes across Windows/macOS for packaged source hashes.
+* -text whitespace=cr-at-eol
+# Markdown hard breaks and translation suffix spaces carry display meaning.
+*.md whitespace=cr-at-eol,-blank-at-eol
+locales/*.txt whitespace=cr-at-eol,-blank-at-eol

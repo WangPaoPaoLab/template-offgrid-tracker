@@ -1,0 +1,151 @@
+{
+  "version": "2026.11.14",
+  "navigation": {
+    "rootTabs": [
+      "设备",
+      "设置"
+    ],
+    "settingsItems": [
+      "账号",
+      "HaLow",
+      "通知",
+      "通用",
+      "帮助",
+      "关于"
+    ],
+    "tabItemWidth": 108,
+    "tabItemMinHeight": 48,
+    "tabGapMax": 28,
+    "chatEntry": "设备 → 聊天产品卡片",
+    "hideRootTabsInsideProducts": true,
+    "home": {
+      "title": "设备",
+      "areas": [
+        "全部",
+        "牧场",
+        "花园",
+        "仓库"
+      ],
+      "defaultArea": "全部",
+      "defaultProductCount": 4,
+      "otherAreas": "empty display only",
+      "assignmentImplemented": false
+    }
+  },
+  "themes": {
+    "light": {
+      "canvas": "#F5F5F7",
+      "card": "#FFFFFF",
+      "surface": "#EFEFF2",
+      "text": "#1D1D1F",
+      "secondary": "#6E6E73",
+      "accent": "#FF8500",
+      "online": "#1479D7",
+      "danger": "#C52A24",
+      "productStroke": "#5B5B61"
+    },
+    "dark": {
+      "canvas": "#000000",
+      "card": "#1C1C1E",
+      "surface": "#2C2C2E",
+      "text": "#F5F5F7",
+      "secondary": "#A1A1A6",
+      "accent": "#FF9A33",
+      "online": "#64ADF3",
+      "danger": "#FF6961",
+      "productStroke": "#C7C7CC"
+    }
+  },
+  "productArtwork": {
+    "viewBox": [
+      0,
+      0,
+      120,
+      100
+    ],
+    "strokeWidth": 1.45,
+    "linecap": "round",
+    "linejoin": "round",
+    "webDisplaySize": [
+      91,
+      74
+    ],
+    "fit": "contain",
+    "pngBaseSize": [
+      120,
+      100
+    ],
+    "halo": {
+      "size": [
+        67,
+        51
+      ],
+      "opacity": 0.65,
+      "colorToken": "surface",
+      "partOfImage": false
+    }
+  },
+  "uiIcons": {
+    "viewBox": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "strokeWidth": 1.65,
+    "typicalDisplaySize": [
+      22,
+      22
+    ],
+    "minimumTouchTarget": [
+      44,
+      44
+    ]
+  },
+  "brand": {
+    "originalPng": [
+      3651,
+      1382
+    ],
+    "displaySize": [
+      156,
+      59
+    ],
+    "transparent": true,
+    "svgContainsEmbeddedRaster": true,
+    "dark": "White neutral ink; original orange retained. No white backing plate.",
+    "joint": {
+      "label": "KEEPTEEN × EdgeZ.ai",
+      "equalStanding": true,
+      "showHardwareSoftwareLabels": false,
+      "aboutShowsHelp": false,
+      "companyUrls": [
+        "https://www.keepteen.com/",
+        "https://www.edgez.ai/"
+      ],
+      "edgezSource": "assets/brand/source/edgez-logo-source.json"
+    }
+  },
+  "layout": {
+    "cardRadius": 23,
+    "sectionRadius": 22,
+    "touchTargetMin": 44,
+    "homeGridColumns": 2,
+    "homeGridGap": 12,
+    "homeAdd": {
+      "touchTarget": 44,
+      "visualFrame": 36,
+      "icon": 22,
+      "frameRadius": 11,
+      "borderWidth": 1
+    }
+  },
+  "sources": {
+    "product-art.js": "f911c9229574a9b14a35cbebc6d958be342e433b49a3a27a3d70b409c8fa0305",
+    "product-ui.js": "15da173e70d7ed16702046e2c72e94c06f075f971ba875a7610a16227b4d8f66",
+    "consumer-ui.css": "f0429362b611243da4bb9b020c4facfc40faca16b025264f5bdf16a1bbf98717",
+    "assets/brand/edgez-logo-light.svg": "8f662bb8c8100ba429effe044b743363864b1729fa3c0d877e1baaf1584c098c",
+    "assets/brand/edgez-logo-dark.svg": "696306c8e1d660d781dd1eb4f7d7a192443bf9e2eb45d764d29b42b350294902",
+    "keepteen-logo.png": "55517fc2f267f7dab3aeb810d3daf14fe7528c9df4858940933043a014b4f0c7"
+  }
+}

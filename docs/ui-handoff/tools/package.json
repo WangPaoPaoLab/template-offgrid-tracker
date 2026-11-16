@@ -1,0 +1,13 @@
+{
+  "name": "keepteen-ui-asset-export",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Deterministic SVG exports for the KEEPTEEN App UI handoff",
+  "scripts": {
+    "export": "node export-assets.cjs",
+    "verify": "node verify-assets.cjs"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "2.6.2"
+  }
+}

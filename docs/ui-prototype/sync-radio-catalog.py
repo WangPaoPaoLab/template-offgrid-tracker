@@ -5,17 +5,26 @@ import re
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SOURCE = HERE.parents[1] / 'firmware/platforms/esp-halow/halow/components/mm-iot-sdk/framework/src/mmregdb/mmregdb.c'
+DRIVER_PATH = Path('firmware/platforms/esp-halow/halow/components/mm-iot-sdk/framework/src/mmregdb/mmregdb.c')
+
+
+def find_source():
+    for parent in HERE.parents:
+        for candidate in (parent / DRIVER_PATH, parent / '01_Software_Source' / DRIVER_PATH):
+            if candidate.is_file():
+                return candidate
+    return None
+
+
+SOURCE = find_source()
 OUTPUT = HERE / 'radio-catalog.js'
 KEYS = ['frequencyHz', 'dutyCycleCentiPercent', 'omitControlResponse',
         'globalOperatingClass', 's1gOperatingClass', 'number', 'bandwidthMHz',
         'maxEirpDbm', 'minPacketSpacingUs', 'airtimeMinUs', 'airtimeMaxUs']
 
 
-def generate(source=SOURCE):
-    if not source.is_file():
-        raise SystemExit('Firmware source not found. Initialize the esp-halow and mm-iot-sdk submodules as described in README.md, or pass --source PATH.')
-    raw = source.read_text(encoding='utf-8')
+def generate():
+    raw = SOURCE.read_text(encoding='utf-8')
     arrays = {}
     for name, block in re.findall(r'const struct mmwlan_s1g_channel (\w+)\[\] = \{(.*?)\n\};', raw, re.S):
         rows = []
@@ -58,9 +67,12 @@ def generate(source=SOURCE):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true', help='Check without writing')
-    parser.add_argument('--source', type=Path, default=SOURCE, help='Override the mmregdb.c source path')
+    parser.add_argument('--source', type=Path, help='Explicit path to the pinned mmregdb.c source')
     args = parser.parse_args()
-    generated, catalog = generate(args.source)
+    SOURCE = args.source if args.source is not None else SOURCE
+    if SOURCE is None or not SOURCE.is_file():
+        parser.error('Driver source not found. Initialize the pinned firmware dependencies or pass --source /path/to/mmregdb.c. The bundled catalog remains usable for viewing the UI.')
+    generated, catalog = generate()
     if args.check:
         if OUTPUT.read_text(encoding='utf-8') != generated:
             raise SystemExit('Channel catalog differs from the registered firmware template domains.')

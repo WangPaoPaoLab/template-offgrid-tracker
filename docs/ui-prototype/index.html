@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Offgrid Tracker - 离线设备中心</title>
+  <title>KEEPTEEN - 设备中心</title>
   <style>
     /* 全局重置与字体 */
     * {
@@ -1226,37 +1226,9 @@
     }
   </style>
   <link rel="stylesheet" href="product-ui.css">
+  <link rel="stylesheet" href="consumer-ui.css?v=20261114-home-areas">
 </head>
 <body>
-  <!-- 顶部控制台 -->
-  <div class="top-control-bar">
-    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-      <span style="font-weight:600;font-size:12px;opacity:0.75;" data-i18n="m263">状态模拟</span>
-      <button id="sim-btn-1" class="theme-toggle-btn" onclick="setSimState(1)">
-        <span class="status-dot-mini" style="background:var(--accent-red);"></span> <span data-i18n="m264">1: 未连主机</span>
-      </button>
-      <button id="sim-btn-2" class="theme-toggle-btn" onclick="setSimState(2)">
-        <span class="status-dot-mini" style="background:var(--accent-orange);"></span> <span data-i18n="m265">2: 主机就绪</span>
-      </button>
-      <button id="sim-btn-3" class="theme-toggle-btn active-state" onclick="setSimState(3)">
-        <span class="status-dot-mini" style="background:var(--badge-online);"></span> <span data-i18n="m266">3: 完整组网</span>
-      </button>
-      <button class="theme-toggle-btn" style="background:rgba(0,122,255,0.12);color:var(--accent-blue);font-weight:600;" onclick="openSetupWizard()" data-i18n="m267">配件配对向导</button>
-    </div>
-    <div style="display:flex;align-items:center;gap:6px;">
-      <button class="theme-toggle-btn" onclick="toggleLanguage()">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-        <span id="lang-btn-text">English</span>
-      </button>
-      <button class="theme-toggle-btn" onclick="toggleTheme()">
-        <span id="theme-icon" style="display:inline-flex;align-items:center;">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        </span>
-        <span id="theme-text">切换 OLED 黑</span>
-      </button>
-    </div>
-  </div>
-
   <!-- 手机外壳 -->
   <div class="phone-wrapper">
     <div class="phone-screen">
@@ -1290,26 +1262,15 @@
       <div id="toast" class="toast-msg" role="status" aria-live="polite"></div>
     </div>
   </div>
-  <aside class="board-notes" aria-label="展示板说明" data-i18n-aria="m268">
-    <strong data-i18n="m268">交互展示板 · 模拟数据</strong>
-    <p data-i18n="m269">项圈与耳标：网关与多节点、地图、围栏。聊天：文字、图片与语音。水阀与摄像头仅展示入口。</p>
-    <div class="board-options">
-      <label><span data-i18n="m270">私聊发送结果</span> <select id="demo-send"><option value="read" data-i18n="m304">模拟已读回执</option><option value="delivered" data-i18n="m271">模拟对端确认</option><option value="failed" data-i18n="m272">模拟超时与重试</option></select></label>
-      <label><span data-i18n="m273">配置应用结果</span> <select id="demo-apply"><option value="success" data-i18n="m274">模拟读回一致</option><option value="failed" data-i18n="m275">模拟下发失败</option></select></label>
-    </div>
-    <p data-i18n="m276">账号验证、配置应用及消息回执均为演示。未连接真实设备或云服务。演示验证码：123456。消息重试使用加速时间。</p>
-    <p data-i18n="m303">演示密码：Demo@123456</p>
-    <p data-i18n="m309">图片和语音仅为本机文件，回执为模拟数据。</p>
-    <div class="board-options"><label><span data-i18n="m319">设备搜索结果</span><select id="demo-scan"><option value="found" data-i18n="m320">发现设备</option><option value="empty" data-i18n="m321">没有设备</option><option value="off" data-i18n="m322">蓝牙未开启</option><option value="denied" data-i18n="m323">权限不足</option></select></label></div>
-    <p data-i18n="m277">地图为可交互示意底图。围栏在本展示板按位置样本演示判断；真实执行位置与同步协议见交接文档。</p>
-    <a href="UI_HANDOFF.md" target="_blank" rel="noopener" data-i18n="m278">查看页面与接口交接说明</a>
-  </aside>
   <script src="radio-catalog.js"></script>
-  <script src="locales/base.js"></script>
-  <script src="locales/packs.js"></script>
+  <script src="locales/base.js?v=20261114-home-areas"></script>
+  <script src="locales/packs.js?v=20261114-home-areas"></script>
   <script src="i18n.js"></script>
-  <script src="product-art.js"></script>
+  <script src="product-art.js?v=20261114-consumer"></script>
   <script src="media.js"></script>
-  <script src="product-ui.js"></script>
+  <script src="alignment-model.js?v=20261114-home-areas"></script>
+  <script src="alignment-keys.js?v=20261114-consumer"></script>
+  <script src="consumer-keys.js?v=20261114-consumer"></script>
+  <script src="product-ui.js?v=20261114-home-areas"></script>
 </body>
 </html>

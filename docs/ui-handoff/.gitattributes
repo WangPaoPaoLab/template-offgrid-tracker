@@ -1,0 +1,5 @@
+# Asset manifests hash exact bytes; checkout must not rewrite line endings.
+* -text whitespace=cr-at-eol
+# Existing Markdown hard breaks and plain-text translation suffixes are intentional.
+*.md whitespace=cr-at-eol,-blank-at-eol
+reference/web_prototype/locales/*.txt whitespace=cr-at-eol,-blank-at-eol
